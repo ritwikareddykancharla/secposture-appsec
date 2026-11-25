@@ -37,7 +37,8 @@ def invoke_bedrock_nova(
         if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
             session = boto3.Session(region_name=region)
         else:
-            profile = os.environ.get("AWS_PROFILE", "portfolio")
+            raw_prof = os.environ.get("AWS_PROFILE", "portfolio")
+            profile = "portfolio" if raw_prof in ("", "trainium") else raw_prof
             session = boto3.Session(profile_name=profile, region_name=region)
 
         client = session.client("bedrock-runtime", region_name=region)

@@ -9,7 +9,9 @@
 set -euo pipefail
 
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-export AWS_PROFILE="${AWS_PROFILE:-portfolio}"
+if [[ -z "${AWS_PROFILE:-}" || "${AWS_PROFILE}" == "trainium" ]]; then
+  export AWS_PROFILE="portfolio"
+fi
 REGION="${AWS_DEFAULT_REGION:-us-west-2}"
 export AWS_DEFAULT_REGION="${REGION}"
 

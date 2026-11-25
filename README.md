@@ -1,6 +1,7 @@
 # SecPosture: AST Call-Graph Reachability, Multi-Hop IAM Attack-Path Solver & Test-Verified Auto-Patching
 
-- **Live CloudFront Application**: Deploying via `infra/deploy_cloudfront.sh` (updated on release)
+- **Live CloudFront Application**: https://d1kwh6hktrqv7x.cloudfront.net
+- **Live `/api/health` Endpoint**: https://d1kwh6hktrqv7x.cloudfront.net/api/health
 - **GitHub Repository**: https://github.com/ritwikareddykancharla/secposture-appsec
 
 SecPosture is a Python 3.12 application security and cloud attack-path automation platform deployed on **Amazon CloudFront + Private S3 (OAC) + AWS Lambda (`python3.12`) + SQLite WAL + Amazon Bedrock (`us.amazon.nova-lite-v1:0`)** with `$0.00` idle infrastructure cost.
