@@ -1,0 +1,2578 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecPosture: Service Security Reviews, Attack-Path Triage, and Test-Verified Auto-Patching</title>
+  <meta name="description" content="SecPosture traces service entrypoints to reachable vulnerabilities, maps multi-hop AWS IAM escalation paths and CloudTrail kill chains, runs STRIDE reviews on Amazon Bedrock, and verifies automated code patches against unit tests." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Martian+Mono:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&amp;family=Schibsted+Grotesk:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-paper: #FAF7F2;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F2ECE1;
+      --bg-obsidian: #141413;
+      --bg-code: #121417;
+      --text-code: #F4F4F5;
+      --ink: #141413;
+      --ink-muted: #52514E;
+      --border: #18181B;
+      --shadow: 4px 4px 0px #18181B;
+      --shadow-sm: 2px 2px 0px #18181B;
+      --dot-color: rgba(24, 24, 27, 0.13);
+      --accent-main: #B91C1C;
+      --accent-ink: #FFFFFF;
+      --accent-soft: #FEE2E2;
+      --accent-deep: #7F1D1D;
+      --blue: #1D4ED8;
+      --blue-soft: #DBEAFE;
+      --pass: #059669;
+      --pass-soft: #D1FAE5;
+      --fail: #DC2626;
+      --fail-soft: #FEE2E2;
+      --warn: #D97706;
+      --warn-soft: #FEF3C7;
+      --purple: #6D28D9;
+      --purple-soft: #EDE9FE;
+    }
+
+    [data-theme="dark"] {
+      --bg-paper: #0E1113;
+      --bg-card: #161A1E;
+      --bg-subtle: #1F252B;
+      --bg-obsidian: #090B0C;
+      --bg-code: #090B0D;
+      --text-code: #E4E4E7;
+      --ink: #F4F4F5;
+      --ink-muted: #A1A1AA;
+      --border: #52525B;
+      --shadow: 4px 4px 0px #000000;
+      --shadow-sm: 2px 2px 0px #000000;
+      --dot-color: rgba(255, 255, 255, 0.08);
+      --accent-main: #DC2626;
+      --accent-ink: #FFFFFF;
+      --accent-soft: #450A0A;
+      --accent-deep: #FCA5A5;
+      --blue: #60A5FA;
+      --blue-soft: #1E293B;
+      --pass: #34D399;
+      --pass-soft: #064E3B;
+      --fail: #F87171;
+      --fail-soft: #450A0A;
+      --warn: #FBBF24;
+      --warn-soft: #451A03;
+      --purple: #C4B5FD;
+      --purple-soft: #2E1065;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-paper);
+      background-image: radial-gradient(var(--dot-color) 1.25px, transparent 1.25px);
+      background-size: 20px 20px;
+      color: var(--ink);
+      line-height: 1.68;
+      padding-bottom: 4.5rem;
+    }
+
+    .serif { font-family: 'Newsreader', Georgia, serif; }
+    .mono { font-family: 'Martian Mono', monospace; }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.6rem;
+    }
+
+    /* Sticky Topbar + Sticky Scroll-Spy Section TOC */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 120;
+      background: var(--bg-paper);
+      border-bottom: 2px solid var(--border);
+      padding: 0.78rem 0;
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .toc-bar {
+      position: sticky;
+      top: 59px;
+      z-index: 110;
+      background: var(--bg-subtle);
+      border-bottom: 2px solid var(--border);
+      padding: 0.52rem 0;
+    }
+
+    .toc-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+    }
+
+    .toc-link {
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 700;
+      padding: 0.24rem 0.62rem;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      transition: background 0.12s ease, transform 0.08s ease;
+    }
+
+    .toc-link:hover {
+      background: var(--accent-soft);
+      transform: translate(-1px, -1px);
+    }
+
+    .toc-link.active {
+      background: var(--accent-main);
+      color: var(--accent-ink);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      font-weight: 800;
+      font-size: 1.16rem;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .brand-badge {
+      background: var(--accent-main);
+      color: var(--accent-ink);
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+      padding: 0.22rem 0.58rem;
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn, .nav-pill {
+      font-family: 'Schibsted Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 0.84rem;
+      padding: 0.5rem 0.92rem;
+      border: 2px solid var(--border);
+      background: var(--bg-card);
+      color: var(--ink);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn:hover, .nav-pill:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: var(--shadow);
+    }
+
+    .btn:active, .nav-pill:active {
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0px var(--border);
+    }
+
+    .btn:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-accent { background: var(--accent-main); color: var(--accent-ink); }
+    .btn-obsidian { background: #18181B; color: #FAF7F2; }
+    [data-theme="dark"] .btn-obsidian { background: var(--accent-main); color: #FFFFFF; }
+    .btn-secondary { background: var(--bg-subtle); }
+    .btn-danger { background: var(--fail-soft); color: var(--fail); }
+
+    /* Hero */
+    .hero {
+      padding: 2.6rem 0 2.3rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .hero-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.05rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.3rem 0.7rem;
+      background: var(--accent-main);
+      color: var(--accent-ink);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .runtime-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.3rem 0.7rem;
+      background: var(--bg-card);
+      color: var(--ink);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--pass);
+      display: inline-block;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 3.6vw, 2.85rem);
+      font-weight: 800;
+      line-height: 1.13;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.95rem;
+      max-width: 1040px;
+    }
+
+    .hero-sub {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: clamp(1.15rem, 1.85vw, 1.34rem);
+      line-height: 1.64;
+      color: var(--ink-muted);
+      max-width: 1020px;
+      margin-bottom: 1.35rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.68rem;
+      margin-bottom: 1.45rem;
+    }
+
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.1rem;
+      margin-top: 1.1rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.4rem;
+    }
+
+    .kpi-card {
+      padding: 1.15rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: var(--accent-main);
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    .kpi-val {
+      font-family: 'Martian Mono', monospace;
+      font-size: 1.34rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-top: 0.25rem;
+    }
+
+    .kpi-label { font-size: 0.88rem; font-weight: 800; color: var(--ink); margin-top: 0.24rem; }
+    .kpi-sub { font-size: 0.8rem; color: var(--ink-muted); margin-top: 0.28rem; line-height: 1.5; }
+
+    .pipeline-bar {
+      margin-top: 1.45rem;
+      background: var(--bg-obsidian);
+      color: #FAF7F2;
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 0.95rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .pipe-step { display: flex; align-items: center; gap: 0.5rem; font-size: 0.84rem; font-weight: 600; }
+    .pipe-num {
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: var(--accent-main);
+      color: #FFFFFF;
+      padding: 0.14rem 0.44rem;
+      border: 1.5px solid #FFFFFF;
+    }
+    .pipe-arrow { color: #FCA5A5; font-family: 'Martian Mono', monospace; font-weight: 700; }
+
+    /* Sections */
+    .section {
+      padding: 2.8rem 0 2.5rem;
+      border-bottom: 2px solid var(--border);
+      scroll-margin-top: 114px;
+    }
+
+    .section-kicker {
+      display: inline-block;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--accent-main);
+      margin-bottom: 0.35rem;
+    }
+    [data-theme="dark"] .section-kicker { color: #FCA5A5; }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1.1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.45rem;
+    }
+
+    .section-title {
+      font-size: 1.62rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .section-desc {
+      font-family: 'Newsreader', Georgia, serif;
+      font-size: 1.15rem;
+      line-height: 1.62;
+      color: var(--ink-muted);
+      max-width: 920px;
+      margin-top: 0.32rem;
+    }
+
+    .overview-callout {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-left: 7px solid var(--accent-main);
+      box-shadow: var(--shadow);
+      padding: 1.35rem 1.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.96rem;
+      line-height: 1.72;
+    }
+
+    .overview-callout h3 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin-bottom: 0.45rem;
+    }
+
+    .scenario-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.45rem 1.55rem;
+      margin-top: 1.5rem;
+    }
+
+    .scenario-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 980px) { .scenario-steps { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 580px) { .scenario-steps { grid-template-columns: 1fr; } }
+
+    .scenario-step {
+      background: var(--bg-subtle);
+      border: 1.5px solid var(--border);
+      padding: 1rem 1.05rem;
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.05rem;
+      margin-bottom: 1.25rem;
+    }
+
+    @media (max-width: 980px) { .problem-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 580px) { .problem-grid { grid-template-columns: 1fr; } }
+
+    .problem-card {
+      padding: 1.2rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .step-badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.18rem 0.52rem;
+      background: var(--accent-soft);
+      color: var(--accent-main);
+      border: 1.5px solid var(--border);
+      text-transform: uppercase;
+    }
+    [data-theme="dark"] .step-badge { color: #FCA5A5; }
+
+    .problem-card h3 { font-size: 1.04rem; font-weight: 800; line-height: 1.3; }
+    .problem-card p { font-size: 0.9rem; color: var(--ink-muted); line-height: 1.66; }
+
+    /* Subsystem & Trade-Off Cards */
+    .module-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.4rem;
+    }
+
+    @media (max-width: 940px) { .module-grid { grid-template-columns: 1fr; } }
+
+    .module-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .module-card-head {
+      background: var(--bg-obsidian);
+      color: #FAF7F2;
+      padding: 0.65rem 1.1rem;
+      border-bottom: 2px solid var(--border);
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .module-card-body {
+      padding: 1.25rem 1.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      flex: 1;
+    }
+
+    .prose-block {
+      background: var(--bg-paper);
+      border: 1.5px solid var(--border);
+      padding: 0.88rem 1.02rem;
+      font-size: 0.91rem;
+      line-height: 1.68;
+      color: var(--ink);
+    }
+
+    .prose-block-tech {
+      background: var(--bg-subtle);
+      border: 1.5px solid var(--border);
+      padding: 0.88rem 1.02rem;
+      font-size: 0.88rem;
+      line-height: 1.68;
+      color: var(--ink-muted);
+    }
+
+    /* Architecture Canvas */
+    .arch-canvas-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      padding: 0.72rem 1rem;
+      background: var(--bg-subtle);
+      border: 2px solid var(--border);
+      border-bottom: none;
+    }
+
+    .arch-canvas-viewport {
+      background-color: #FFFFFF;
+      background-image: radial-gradient(rgba(24, 24, 27, 0.14) 1px, transparent 1px);
+      background-size: 18px 18px;
+      border: 2px solid #18181B;
+      box-shadow: 4px 4px 0px #18181B;
+      overflow-x: auto;
+      padding: 0.9rem;
+    }
+
+    .arch-canvas-svg {
+      display: block;
+      width: 100%;
+      min-width: 980px;
+      height: auto;
+      transition: width 0.22s ease, min-width 0.22s ease;
+    }
+
+    .arch-canvas-svg.zoom-125 {
+      width: 125%;
+      min-width: 1225px;
+    }
+
+    .svg-title { font-family: 'Caveat', cursive; }
+    .svg-mono { font-family: 'Martian Mono', monospace; }
+
+    .arch-node {
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+
+    .arch-node:hover {
+      filter: drop-shadow(3px 3px 0px #B91C1C);
+    }
+
+    .arch-node.selected .arch-stroke-main {
+      stroke: #B91C1C !important;
+      stroke-width: 3.2px !important;
+    }
+
+    .arch-inspector {
+      margin-top: 1.05rem;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 1.15rem 1.3rem;
+    }
+
+    .arch-node-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.42rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .arch-node-pill {
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.69rem;
+      font-weight: 700;
+      padding: 0.28rem 0.6rem;
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .arch-node-pill.active {
+      background: var(--accent-main);
+      color: #FFFFFF;
+    }
+
+    /* Interactive Demo Tabs */
+    .tab-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.78rem;
+      margin-bottom: 1.45rem;
+    }
+
+    @media (max-width: 960px) { .tab-bar { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 580px) { .tab-bar { grid-template-columns: 1fr; } }
+
+    .tab-btn {
+      text-align: left;
+      padding: 0.98rem 1.05rem;
+      background: var(--bg-card);
+      color: var(--ink);
+      border: 2px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.34rem;
+    }
+
+    .tab-btn:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow); }
+    .tab-btn.active {
+      background: var(--accent-main);
+      color: var(--accent-ink);
+      box-shadow: var(--shadow);
+      transform: translate(-1px, -1px);
+    }
+
+    .tab-btn-eyebrow { font-family: 'Martian Mono', monospace; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; opacity: 0.88; }
+    .tab-btn-title { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.25; }
+    .tab-btn-desc { font-size: 0.78rem; line-height: 1.45; opacity: 0.92; }
+    .tab-btn-metric { font-family: 'Martian Mono', monospace; font-size: 0.66rem; font-weight: 700; opacity: 0.9; margin-top: 0.15rem; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .sim-header {
+      margin-bottom: 1.15rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .sim-title { font-size: 1.38rem; font-weight: 800; letter-spacing: -0.02em; }
+    .sim-desc { font-family: 'Newsreader', Georgia, serif; font-size: 1.09rem; color: var(--ink-muted); max-width: 860px; margin-top: 0.25rem; }
+
+    .grid-2 { display: grid; grid-template-columns: 1.05fr 1.15fr; gap: 1.3rem; align-items: start; }
+    .grid-equal { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3rem; align-items: start; }
+    @media (max-width: 940px) { .grid-2, .grid-equal { grid-template-columns: 1fr; } }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.18rem 0.52rem;
+      border: 1.5px solid var(--border);
+      text-transform: uppercase;
+    }
+
+    .tag-accent { background: var(--accent-main); color: var(--accent-ink); }
+    .tag-soft { background: var(--accent-soft); color: var(--accent-main); }
+    [data-theme="dark"] .tag-soft { color: #FCA5A5; }
+    .tag-pass { background: var(--pass-soft); color: var(--pass); }
+    .tag-fail { background: var(--fail-soft); color: var(--fail); }
+    .tag-warn { background: var(--warn-soft); color: var(--warn); }
+
+    .svc-list { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 0.9rem; }
+    .svc-card {
+      border: 2px solid var(--border);
+      background: var(--bg-paper);
+      padding: 0.8rem 0.95rem;
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .svc-card:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+    .svc-card.selected { background: var(--accent-soft); border-width: 2.5px; box-shadow: var(--shadow-sm); }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.83rem;
+      font-weight: 700;
+      margin-bottom: 0.38rem;
+    }
+
+    textarea, select, input[type="text"] {
+      width: 100%;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.74rem;
+      padding: 0.65rem 0.78rem;
+      background: var(--bg-paper);
+      color: var(--ink);
+      border: 2px solid var(--border);
+      line-height: 1.52;
+    }
+    textarea:focus, select:focus, input[type="text"]:focus { outline: 2px solid var(--accent-main); outline-offset: 1px; }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-subtle);
+      border: 2px solid var(--border);
+      border-bottom: none;
+      padding: 0.48rem 0.85rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.71rem;
+      font-weight: 700;
+    }
+
+    .code-box {
+      background: var(--bg-code);
+      color: var(--text-code);
+      border: 2px solid var(--border);
+      padding: 0.95rem 1.05rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.73rem;
+      line-height: 1.58;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .verdict-banner {
+      border: 2px solid var(--border);
+      padding: 0.88rem 1.02rem;
+      margin-bottom: 0.9rem;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .verdict-allow { background: var(--pass-soft); }
+    .verdict-deny { background: var(--fail-soft); }
+    .verdict-warn { background: var(--warn-soft); }
+
+    .gate-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.65rem;
+      margin-bottom: 0.9rem;
+    }
+    @media (max-width: 640px) { .gate-strip { grid-template-columns: 1fr; } }
+
+    .gate-pill {
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      padding: 0.65rem 0.75rem;
+      font-family: 'Martian Mono', monospace;
+      font-size: 0.71rem;
+    }
+
+    .finding-item {
+      border: 1.5px solid var(--border);
+      background: var(--bg-paper);
+      padding: 0.75rem 0.88rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .table-wrap { overflow-x: auto; border: 2px solid var(--border); background: var(--bg-card); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { padding: 0.62rem 0.76rem; text-align: left; border-bottom: 1.5px solid var(--border); vertical-align: top; }
+    th { background: var(--bg-subtle); font-family: 'Martian Mono', monospace; font-size: 0.68rem; text-transform: uppercase; font-weight: 700; }
+    tr:last-child td { border-bottom: none; }
+
+    .bar-group { display: flex; flex-direction: column; gap: 0.65rem; margin: 0.8rem 0; }
+    .bar-row { display: flex; flex-direction: column; gap: 0.24rem; }
+    .bar-meta { display: flex; justify-content: space-between; font-family: 'Martian Mono', monospace; font-size: 0.72rem; font-weight: 600; }
+    .bar-track { width: 100%; height: 16px; background: var(--bg-subtle); border: 1.5px solid var(--border); overflow: hidden; }
+    .bar-fill { height: 100%; transition: width 0.28s ease; }
+    .bar-fill-accent { background: var(--accent-main); }
+    .bar-fill-pass { background: var(--pass); }
+
+    .footer {
+      margin-top: 2.8rem;
+      padding-top: 1.6rem;
+      border-top: 2px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.84rem;
+      color: var(--ink-muted);
+    }
+  </style>
+</head>
+<body>
+  <!-- Sticky Topbar -->
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="#top" class="brand">
+        <span class="brand-badge">SECPOSTURE v1.0</span>
+        <span>SecPosture</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a class="nav-pill" href="https://d3gk5qze5xyz7y.cloudfront.net" target="_blank" rel="noopener">DeskPilot ↗</a>
+        <a class="nav-pill" href="https://d13kangk4fqjbf.cloudfront.net" target="_blank" rel="noopener">AegisOps ↗</a>
+        <a class="btn btn-obsidian" href="https://github.com/ritwikareddykancharla/secposture-appsec" target="_blank" rel="noopener">★ GitHub Repo</a>
+        <button type="button" class="btn btn-secondary" id="themeToggleBtn" aria-label="Toggle color theme">
+          <span id="themeIcon">🌙</span>
+          <span id="themeLabel">Dark Mode</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Sticky Scroll-Spy Section TOC -->
+  <nav class="toc-bar" aria-label="Section Navigation">
+    <div class="container toc-inner" id="sectionTocLinks">
+      <span style="font-weight:700; color:var(--ink-muted);">SECTIONS:</span>
+      <a class="toc-link active" href="#problem" data-toc-sec="problem">01 · Problem</a>
+      <a class="toc-link" href="#architecture" data-toc-sec="architecture">02 · Architecture</a>
+      <a class="toc-link" href="#implementation" data-toc-sec="implementation">03 · Implementation</a>
+      <a class="toc-link" href="#tradeoffs" data-toc-sec="tradeoffs">04 · Trade-Offs</a>
+      <a class="toc-link" href="#studio" data-toc-sec="studio">05 · Live Demo</a>
+      <a class="toc-link" href="#benchmarks" data-toc-sec="benchmarks">06 · Benchmarks</a>
+    </div>
+  </nav>
+
+  <main class="container" id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-top-row">
+        <div class="eyebrow">Application Security &amp; Attack-Path Automation · Built for Amazon Security</div>
+        <div class="runtime-pill" id="runtimePill">
+          <span class="pulse-dot" id="runtimePulseDot"></span>
+          <span id="runtimeModeText">Live Interactive Demo · Powered by Amazon Bedrock</span>
+        </div>
+      </div>
+
+      <h1>SecPosture: Service Security Reviews, Attack-Path Triage, and Test-Verified Auto-Patching</h1>
+      <p class="hero-sub">
+        Security scanners flood engineering teams with noisy alerts from unused helper functions while missing multi-step cloud permission paths. SecPosture traces live entrypoints to real vulnerabilities, maps privilege paths across cloud roles, and verifies automated code fixes against unit tests before review.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-accent" href="#studio">▶ Try the Live Demo ↓</a>
+        <a class="btn btn-secondary" href="#architecture">See System Architecture ↓</a>
+        <a class="btn btn-secondary" href="#benchmarks">View Benchmark Results ↓</a>
+      </div>
+
+      <div class="kpi-strip" id="heroKpiStrip"></div>
+
+      <div class="pipeline-bar" role="region" aria-label="SecPosture Verification Flow">
+        <div class="pipe-step"><span class="pipe-num">01</span><span>Trace Entrypoints to Live Sinks</span></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step"><span class="pipe-num">02</span><span>Map IAM &amp; CloudTrail Kill Chains</span></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step"><span class="pipe-num">03</span><span>Generate Minimal Code &amp; IAM Patch</span></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step"><span class="pipe-num">04</span><span>Re-Scan &amp; Run Unit Tests in /tmp</span></div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 01 · PROBLEM                                                        -->
+    <!-- =================================================================== -->
+    <section id="problem" class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">01 · Problem</span>
+          <h2 class="section-title">Problem</h2>
+          <p class="section-desc">
+            Application security teams and service builders lose days triaging unreachable static scanner alerts, conducting manual launch threat reviews, and reviewing AI-suggested patches that break production behavior.
+          </p>
+        </div>
+        <span class="tag tag-accent">AppSec &amp; Cloud Posture</span>
+      </div>
+
+      <div class="overview-callout">
+        <h3>Overview</h3>
+        <p>
+          SecPosture automates service posture assessment and remediation across application code and AWS identity boundaries. Its AST analyzer parses Python services in <code>0.509 ms</code> median, traces public HTTP routes and <code>lambda_handler</code> entrypoints across helper calls, and filters out <code>44.4%</code> (<code>8 / 18</code>) of dead-code alerts while keeping <code>100.0%</code> recall (<code>10 / 10</code>) on live exploitable paths. Its graph solver maps multi-hop AWS IAM escalations (<code>iam:PassRole</code>, <code>sts:AssumeRole</code>, wildcard <code>s3:GetObject</code>) alongside stateful CloudTrail kill-chain telemetry. Finally, its closed-loop patcher writes minimal code fixes into an isolated <code>/tmp</code> sandbox, re-runs the AST scanner to confirm <code>0</code> reachable flaws remain, and runs <code>unittest</code> (<code>12 / 12</code> runs verified, <code>16 / 16</code> service tests passing) before marking any patch ready for code review.
+        </p>
+      </div>
+
+      <div class="problem-grid">
+        <div class="card problem-card">
+          <span class="step-badge">01 · ALERT FATIGUE</span>
+          <h3>Dead-Code Findings Bury Real Risks</h3>
+          <p>Pattern-only scanners treat an uncalled legacy migration helper identically to a public checkout endpoint, forcing engineers to chase harmless findings while live SQL injection or SSRF paths wait in queues.</p>
+        </div>
+        <div class="card problem-card">
+          <span class="step-badge">02 · COMPOUND PATHS</span>
+          <h3>Code &amp; IAM Are Reviewed in Silos</h3>
+          <p>An outbound URL bug looks moderate alone until combined with an execution role holding <code>iam:PassRole</code> and <code>lambda:UpdateFunctionCode</code> over an admin role that reads customer KYC buckets.</p>
+        </div>
+        <div class="card problem-card">
+          <span class="step-badge">03 · UNVERIFIED FIXES</span>
+          <h3>Raw LLM Patches Break Service Behavior</h3>
+          <p>Asking a language model to rewrite a vulnerable module often alters unrelated helpers, introduces syntax errors, or breaks callers unless a deterministic test harness gates every diff.</p>
+        </div>
+        <div class="card problem-card">
+          <span class="step-badge">04 · SINGLE-EVENT SIEM NOISE</span>
+          <h3>Isolated Log Rules Miss Kill Chains</h3>
+          <p>Alerting on every single <code>AccessDenied</code> or <code>AssumeRole</code> floods on-call responders, whereas real intrusions progress through reconnaissance, credential access, lateral movement, and bulk data reads.</p>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+          <div>
+            <span class="step-badge">EXAMPLE · COMPOUND POSTURE &amp; VERIFIED PATCH</span>
+            <h3 style="font-size:1.15rem; font-weight:800; margin-top:0.35rem;">Example: Triaging &amp; Auto-Patching the Checkout Ledger Service Before Launch</h3>
+          </div>
+          <span class="tag tag-pass">Testable in Live Demo</span>
+        </div>
+        <div class="scenario-steps">
+          <div class="scenario-step">
+            <div class="mono" style="font-size:0.7rem; font-weight:700; color:var(--accent-main); margin-bottom:0.3rem;">1 · REACHABILITY SCAN (1.03 ms)</div>
+            <code>orders_service.py</code> triggers <code>5</code> raw findings. SecPosture proves <code>3</code> are reachable from <code>@route("/orders/search")</code> and <code>lambda_handler</code>, and filters <code>2</code> uncalled V1 helpers.
+          </div>
+          <div class="scenario-step">
+            <div class="mono" style="font-size:0.7rem; font-weight:700; color:var(--fail); margin-bottom:0.3rem;">2 · 3-HOP IAM ESCALATION FOUND</div>
+            <code>analyze_iam_attack_paths()</code> links the SSRF sink in <code>CheckoutServiceRole</code> via <code>iam:PassRole</code> + <code>lambda:UpdateFunctionCode</code> to <code>DataMigrationAdminRole</code> and <code>prod-customer-kyc-vault</code>.
+          </div>
+          <div class="scenario-step">
+            <div class="mono" style="font-size:0.7rem; font-weight:700; color:var(--warn); margin-bottom:0.3rem;">3 · MINIMAL DIFF SYNTHESIZED</div>
+            <code>autopatch_loop.py</code> binds SQL parameters with <code>?</code>, inserts <code>_validate_https_allowlist()</code> blocking <code>169.254.169.254</code>, and loads <code>CHECKOUT_HMAC_SECRET</code> from environment variables.
+          </div>
+          <div class="scenario-step">
+            <div class="mono" style="font-size:0.7rem; font-weight:700; color:var(--pass); margin-bottom:0.3rem;">4 · RE-SCANNED &amp; TESTED (72.1 ms)</div>
+            Inside an isolated <code>/tmp</code> folder, AST re-scan confirms <code>0</code> reachable flaws and <code>unittest</code> passes all <code>4 / 4</code> behavioral tests, appending a SHA-256 audit receipt.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 02 · ARCHITECTURE                                                   -->
+    <!-- =================================================================== -->
+    <section id="architecture" class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">02 · Architecture</span>
+          <h2 class="section-title">Architecture</h2>
+          <p class="section-desc">
+            Static UI assets are served by Amazon CloudFront from a private S3 bucket via Origin Access Control, and <code>/api/*</code> routes execute on Python 3.12 AWS Lambda with on-demand Amazon Bedrock access. Click any component below to inspect its module, security boundary, and measured latency.
+          </p>
+        </div>
+      </div>
+
+      <div class="arch-canvas-toolbar">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <span class="mono" style="font-size:0.72rem; font-weight:700;">SYSTEM ARCHITECTURE · CLICK ANY COMPONENT TO INSPECT</span>
+          <span class="tag tag-accent" id="archZoomLabel">Zoom: 100%</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-accent" id="zoom100Btn" style="padding:0.32rem 0.65rem; font-size:0.76rem;">100%</button>
+          <button type="button" class="btn btn-secondary" id="zoom125Btn" style="padding:0.32rem 0.65rem; font-size:0.76rem;">125%</button>
+          <button type="button" class="btn btn-secondary" id="zoomResetBtn" style="padding:0.32rem 0.65rem; font-size:0.76rem;">↺ Reset</button>
+          <button type="button" class="btn btn-secondary" id="downloadArchSvgBtn" style="padding:0.32rem 0.65rem; font-size:0.76rem;">⬇ Export SVG</button>
+        </div>
+      </div>
+
+      <div class="arch-canvas-viewport" id="archViewport">
+        <svg id="secpostureArchSvg" class="arch-canvas-svg" viewBox="0 0 1220 730" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SecPosture System Architecture Diagram">
+          <defs>
+            <pattern id="archDotGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1" fill="#D4D4D8" />
+            </pattern>
+          </defs>
+
+          <rect x="0" y="0" width="1220" height="730" fill="#FFFFFF" />
+          <rect x="0" y="0" width="1220" height="730" fill="url(#archDotGrid)" opacity="0.68" />
+
+          <!-- LAYER 1: BROWSER & SERVERLESS AWS EDGE -->
+          <path d="M 22,18 Q 610,14 1196,19 Q 1201,92 1195,164 Q 608,168 24,163 Q 19,90 22,18 Z" fill="#FAFAFA" stroke="#71717A" stroke-width="1.6" stroke-dasharray="8 6" />
+          <text x="36" y="41" class="svg-title" font-size="21" font-weight="700" fill="#B91C1C">① Builder Browser &amp; Serverless AWS Edge (CloudFront + Private S3 OAC + Python 3.12 Lambda)</text>
+
+          <g class="arch-node selected" data-arch-node="edge-browser" tabindex="0">
+            <path d="M 38,55 Q 136,52 234,56 Q 238,96 233,138 Q 135,141 39,137 Q 35,95 38,55 Z" fill="#DBEAFE" />
+            <path class="arch-stroke-main" d="M 38,55 Q 136,52 234,56 Q 238,96 233,138 Q 135,141 39,137 Q 35,95 38,55 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="136" y="83" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#18181B">AppSec Workbench UI</text>
+            <text x="136" y="105" text-anchor="middle" class="svg-mono" font-size="10" font-weight="600" fill="#1E3A8A">4 Interactive Security Labs</text>
+            <text x="136" y="123" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#3F3F46">URL hash state · Dark mode</text>
+          </g>
+
+          <path d="M 237,96 Q 268,92 298,96" fill="none" stroke="#18181B" stroke-width="2.1" stroke-dasharray="6 4" />
+          <path d="M 289,90 L 300,96 L 289,102" fill="none" stroke="#18181B" stroke-width="2.1" />
+          <text x="268" y="86" text-anchor="middle" class="svg-title" font-size="16" font-weight="700" fill="#18181B">HTTPS</text>
+
+          <g class="arch-node" data-arch-node="edge-cloudfront" tabindex="0">
+            <path d="M 304,55 Q 430,51 556,56 Q 560,96 555,138 Q 428,142 305,137 Q 301,95 304,55 Z" fill="#FEE2E2" />
+            <path class="arch-stroke-main" d="M 304,55 Q 430,51 556,56 Q 560,96 555,138 Q 428,142 305,137 Q 301,95 304,55 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="430" y="83" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#18181B">Amazon CloudFront</text>
+            <text x="430" y="105" text-anchor="middle" class="svg-mono" font-size="10" font-weight="600" fill="#991B1B">Unified Edge Distribution</text>
+            <text x="430" y="123" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#3F3F46">/* -&gt; S3 OAC · /api/* -&gt; Lambda</text>
+          </g>
+
+          <path d="M 559,78 Q 596,66 634,66" fill="none" stroke="#18181B" stroke-width="2" stroke-dasharray="6 4" />
+          <path d="M 625,60 L 636,66 L 625,72" fill="none" stroke="#18181B" stroke-width="2" />
+          <text x="596" y="59" text-anchor="middle" class="svg-title" font-size="15" font-weight="700" fill="#065F46">Static UI</text>
+
+          <path d="M 559,114 Q 596,126 634,126" fill="none" stroke="#18181B" stroke-width="2" stroke-dasharray="6 4" />
+          <path d="M 625,120 L 636,126 L 625,132" fill="none" stroke="#18181B" stroke-width="2" />
+          <text x="596" y="143" text-anchor="middle" class="svg-title" font-size="15" font-weight="700" fill="#B91C1C">/api/*</text>
+
+          <g class="arch-node" data-arch-node="edge-s3" tabindex="0">
+            <path d="M 640,39 Q 775,36 910,40 Q 913,65 909,90 Q 774,93 641,89 Q 637,64 640,39 Z" fill="#DCFCE7" />
+            <path class="arch-stroke-main" d="M 640,39 Q 775,36 910,40 Q 913,65 909,90 Q 774,93 641,89 Q 637,64 640,39 Z" fill="none" stroke="#18181B" stroke-width="2" />
+            <text x="775" y="61" text-anchor="middle" class="svg-title" font-size="20" font-weight="700" fill="#18181B">Private S3 Bucket (OAC)</text>
+            <text x="775" y="79" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#065F46">web/index.html · BlockPublicAccess</text>
+          </g>
+
+          <g class="arch-node" data-arch-node="edge-lambda" tabindex="0">
+            <path d="M 640,100 Q 775,97 910,101 Q 913,127 909,153 Q 774,156 641,152 Q 637,126 640,100 Z" fill="#FFE8D6" />
+            <path class="arch-stroke-main" d="M 640,100 Q 775,97 910,101 Q 913,127 909,153 Q 774,156 641,152 Q 637,126 640,100 Z" fill="none" stroke="#18181B" stroke-width="2" />
+            <text x="775" y="123" text-anchor="middle" class="svg-title" font-size="20" font-weight="700" fill="#18181B">AWS Lambda API (Python 3.12)</text>
+            <text x="775" y="142" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#9A3412">secposture/server.py · 512 MB</text>
+          </g>
+
+          <g transform="rotate(-1.5 1055 95)">
+            <path d="M 936,40 L 1178,40 L 1178,134 L 1160,150 L 936,150 Z" fill="#FEF3C7" stroke="#18181B" stroke-width="2" />
+            <path d="M 1160,150 L 1160,134 L 1178,134" fill="#FDE68A" stroke="#18181B" stroke-width="1.6" />
+            <text x="950" y="66" class="svg-title" font-size="19" font-weight="700" fill="#92400E">📌 Serverless Budget</text>
+            <text x="950" y="89" class="svg-title" font-size="17" font-weight="600" fill="#18181B">• $0.00 idle standing compute</text>
+            <text x="950" y="110" class="svg-title" font-size="17" font-weight="600" fill="#18181B">• 0.509 ms AST reachability scan</text>
+            <text x="950" y="131" class="svg-title" font-size="17" font-weight="700" fill="#B91C1C">• 100% test-gated code patches</text>
+          </g>
+
+          <path d="M 775,154 Q 770,176 612,194" fill="none" stroke="#18181B" stroke-width="2.1" stroke-dasharray="7 5" />
+          <path d="M 621,188 L 610,195 L 622,200" fill="none" stroke="#18181B" stroke-width="2.1" />
+          <text x="755" y="183" class="svg-title" font-size="16" font-weight="700" fill="#18181B">Analyze Code, IAM &amp; Telemetry</text>
+
+          <!-- LAYER 2: DETERMINISTIC REACHABILITY & ATTACK-PATH ANALYZERS -->
+          <path d="M 22,196 Q 610,192 1196,197 Q 1200,268 1195,338 Q 608,342 24,337 Q 19,266 22,196 Z" fill="#FFF1F2" stroke="#B91C1C" stroke-width="1.6" stroke-dasharray="8 6" />
+          <text x="36" y="219" class="svg-title" font-size="21" font-weight="700" fill="#B91C1C">② Deterministic AST Reachability, IAM Attack-Path &amp; CloudTrail Analyzers (44.4% Dead-Code Noise Cut)</text>
+
+          <g class="arch-node" data-arch-node="ast-scanner" tabindex="0">
+            <path d="M 42,233 Q 218,229 394,234 Q 398,279 393,324 Q 216,328 43,323 Q 39,278 42,233 Z" fill="#FEE2E2" />
+            <path class="arch-stroke-main" d="M 42,233 Q 218,229 394,234 Q 398,279 393,324 Q 216,328 43,323 Q 39,278 42,233 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="218" y="261" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#991B1B">AST Reachability Scanner</text>
+            <text x="218" y="283" text-anchor="middle" class="svg-mono" font-size="9.8" font-weight="700" fill="#18181B">secposture/reachability_ast.py</text>
+            <text x="218" y="303" text-anchor="middle" class="svg-mono" font-size="9.3" fill="#7F1D1D">SQLi · CMDi · SSRF · Pickle · Secrets</text>
+          </g>
+
+          <g class="arch-node" data-arch-node="iam-graph" tabindex="0">
+            <path d="M 432,233 Q 610,229 788,234 Q 792,279 787,324 Q 609,328 433,323 Q 429,278 432,233 Z" fill="#DBEAFE" />
+            <path class="arch-stroke-main" d="M 432,233 Q 610,229 788,234 Q 792,279 787,324 Q 609,328 433,323 Q 429,278 432,233 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="610" y="261" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#18181B">IAM Attack-Path Solver</text>
+            <text x="610" y="283" text-anchor="middle" class="svg-mono" font-size="9.8" font-weight="600" fill="#1E3A8A">Dijkstra over PassRole &amp; AssumeRole</text>
+            <text x="610" y="303" text-anchor="middle" class="svg-mono" font-size="9.3" fill="#3F3F46">0.021 ms median · 4 -&gt; 0 crown paths</text>
+          </g>
+
+          <g class="arch-node" data-arch-node="cloudtrail-detector" tabindex="0">
+            <path d="M 824,233 Q 1001,229 1178,234 Q 1182,279 1177,324 Q 1000,328 825,323 Q 821,278 824,233 Z" fill="#FEF3C7" />
+            <path class="arch-stroke-main" d="M 824,233 Q 1001,229 1178,234 Q 1182,279 1177,324 Q 1000,328 825,323 Q 821,278 824,233 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="1001" y="261" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#92400E">CloudTrail Kill-Chain Engine</text>
+            <text x="1001" y="283" text-anchor="middle" class="svg-mono" font-size="9.8" font-weight="700" fill="#18181B">Recon -&gt; Creds -&gt; Lateral -&gt; Exfil</text>
+            <text x="1001" y="303" text-anchor="middle" class="svg-mono" font-size="9.3" fill="#78350F">8 / 8 Attacks Caught · 0 False Positives</text>
+          </g>
+
+          <path d="M 380,326 Q 340,355 315,380" fill="none" stroke="#18181B" stroke-width="2" stroke-dasharray="6 4" />
+          <path d="M 323,371 L 313,381 L 326,382" fill="none" stroke="#18181B" stroke-width="2" />
+          <text x="240" y="362" class="svg-title" font-size="16" font-weight="700" fill="#065F46">Reachable Sinks Only</text>
+
+          <path d="M 860,326 Q 885,355 905,380" fill="none" stroke="#18181B" stroke-width="2" stroke-dasharray="6 4" />
+          <path d="M 896,377 L 907,381 L 905,369" fill="none" stroke="#18181B" stroke-width="2" />
+          <text x="920" y="362" class="svg-title" font-size="16" font-weight="700" fill="#1D4ED8">Verify Patch in /tmp</text>
+
+          <!-- LAYER 3: CLOSED-LOOP AUTO-PATCH & UNIT-TEST VERIFICATION -->
+          <path d="M 22,380 Q 610,376 1196,381 Q 1200,452 1195,522 Q 608,526 24,521 Q 19,450 22,380 Z" fill="#F0FDF4" stroke="#065F46" stroke-width="1.6" stroke-dasharray="8 6" />
+          <text x="36" y="404" class="svg-title" font-size="21" font-weight="700" fill="#065F46">③ Closed-Loop Vulnerability Auto-Patcher &amp; Isolated /tmp Verification Gates (67.01 ms median)</text>
+
+          <g class="arch-node" data-arch-node="autopatch-synth" tabindex="0">
+            <path d="M 42,418 Q 312,414 582,419 Q 586,464 581,508 Q 310,512 43,507 Q 39,462 42,418 Z" fill="#DCFCE7" />
+            <path class="arch-stroke-main" d="M 42,418 Q 312,414 582,419 Q 586,464 581,508 Q 310,512 43,507 Q 39,462 42,418 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="312" y="446" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#18181B">Minimal Code &amp; IAM Patch Synthesizer</text>
+            <text x="312" y="468" text-anchor="middle" class="svg-mono" font-size="9.8" font-weight="700" fill="#065F46">secposture/autopatch_loop.py</text>
+            <text x="312" y="489" text-anchor="middle" class="svg-mono" font-size="9.3" fill="#3F3F46">? SQL tuples · shell=False · HTTPS allowlist · json.loads</text>
+          </g>
+
+          <g class="arch-node" data-arch-node="tmp-verifier" tabindex="0">
+            <path d="M 624,418 Q 901,414 1178,419 Q 1182,464 1177,508 Q 900,512 625,507 Q 621,462 624,418 Z" fill="#DBEAFE" />
+            <path class="arch-stroke-main" d="M 624,418 Q 901,414 1178,419 Q 1182,464 1177,508 Q 900,512 625,507 Q 621,462 624,418 Z" fill="none" stroke="#18181B" stroke-width="2.1" />
+            <text x="901" y="446" text-anchor="middle" class="svg-title" font-size="22" font-weight="700" fill="#18181B">AST Re-Scan + Isolated /tmp Unittest Gate</text>
+            <text x="901" y="468" text-anchor="middle" class="svg-mono" font-size="9.8" font-weight="700" fill="#1E3A8A">ast.parse + 0 Reachable Vulns + python3 -m unittest</text>
+            <text x="901" y="489" text-anchor="middle" class="svg-mono" font-size="9.3" fill="#3F3F46">12 / 12 Runs Verified · 16 / 16 Service Tests Passing</text>
+          </g>
+
+          <path d="M 312,510 Q 312,542 312,568" fill="none" stroke="#6D28D9" stroke-width="2.1" stroke-dasharray="6 4" />
+          <path d="M 306,560 L 312,570 L 318,560" fill="none" stroke="#6D28D9" stroke-width="2.1" />
+          <text x="326" y="548" class="svg-title" font-size="16" font-weight="700" fill="#6D28D9">STRIDE Review &amp; CR Brief</text>
+
+          <path d="M 901,510 Q 901,542 901,568" fill="none" stroke="#065F46" stroke-width="2.1" stroke-dasharray="6 4" />
+          <path d="M 895,560 L 901,570 L 907,560" fill="none" stroke="#065F46" stroke-width="2.1" />
+          <text x="915" y="548" class="svg-title" font-size="16" font-weight="700" fill="#065F46">Append SHA-256 Receipt</text>
+
+          <!-- LAYER 4: BEDROCK STRIDE MODELER & SQLITE AUDIT LEDGER -->
+          <g class="arch-node" data-arch-node="bedrock-stride" tabindex="0">
+            <path d="M 42,574 Q 312,569 582,575 Q 586,642 581,708 Q 310,713 43,707 Q 39,640 42,574 Z" fill="#F3E8FF" />
+            <path class="arch-stroke-main" d="M 42,574 Q 312,569 582,575 Q 586,642 581,708 Q 310,713 43,707 Q 39,640 42,574 Z" fill="none" stroke="#18181B" stroke-width="2.2" />
+            <text x="312" y="604" text-anchor="middle" class="svg-title" font-size="23" font-weight="700" fill="#5B21B6">④ Amazon Bedrock Threat Modeler</text>
+            <text x="312" y="629" text-anchor="middle" class="svg-mono" font-size="10" font-weight="700" fill="#18181B">us.amazon.nova-lite-v1:0 · Converse API</text>
+            <text x="312" y="651" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#4C1D95">Anchors STRIDE threat reviews to exact file:line &amp; IAM ARNs</text>
+            <rect x="92" y="666" width="440" height="28" fill="#FFFFFF" stroke="#18181B" stroke-width="1.6" />
+            <text x="312" y="684" text-anchor="middle" class="svg-mono" font-size="9.6" font-weight="700" fill="#B91C1C">⚡ 8 Live Calls Measured · 1,104 ms Median (595 Mean Tokens)</text>
+          </g>
+
+          <path d="M 585,642 L 620,642" fill="none" stroke="#18181B" stroke-width="2" stroke-dasharray="5 4" />
+          <path d="M 613,636 L 622,642 L 613,648" fill="none" stroke="#18181B" stroke-width="2" />
+
+          <g class="arch-node" data-arch-node="sqlite-ledger" tabindex="0">
+            <path d="M 624,574 Q 901,569 1178,575 Q 1182,642 1177,708 Q 900,713 625,707 Q 621,640 624,574 Z" fill="#FEF3C7" />
+            <path class="arch-stroke-main" d="M 624,574 Q 901,569 1178,575 Q 1182,642 1177,708 Q 900,713 625,707 Q 621,640 624,574 Z" fill="none" stroke="#18181B" stroke-width="2.2" />
+            <text x="901" y="604" text-anchor="middle" class="svg-title" font-size="23" font-weight="700" fill="#92400E">④ Tamper-Evident Security Ledger</text>
+            <text x="901" y="629" text-anchor="middle" class="svg-mono" font-size="10" font-weight="700" fill="#18181B">SQLite WAL · SHA-256 Hash Chain</text>
+            <text x="901" y="651" text-anchor="middle" class="svg-mono" font-size="9.4" fill="#78350F">Links every scan, patch diff, test run, and quarantine receipt</text>
+            <rect x="681" y="666" width="440" height="28" fill="#DCFCE7" stroke="#18181B" stroke-width="1.6" />
+            <text x="901" y="684" text-anchor="middle" class="svg-mono" font-size="9.6" font-weight="700" fill="#065F46">✓ 58 Benchmark Entries Verified in 1.792 ms</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Interactive Component Inspector -->
+      <div class="arch-inspector" id="archInspector">
+        <div class="arch-node-pills" id="archNodePills">
+          <button type="button" class="arch-node-pill active" data-arch-btn="edge-browser">1. Workbench UI</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="edge-cloudfront">2. CloudFront</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="edge-s3">3. Private S3 OAC</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="edge-lambda">4. Lambda API</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="ast-scanner">5. AST Reachability</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="iam-graph">6. IAM Graph Solver</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="cloudtrail-detector">7. Kill-Chain Engine</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="autopatch-synth">8. Auto-Patcher</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="tmp-verifier">9. /tmp Test Gate</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="bedrock-stride">10. Bedrock STRIDE</button>
+          <button type="button" class="arch-node-pill" data-arch-btn="sqlite-ledger">11. Audit Ledger</button>
+        </div>
+        <div id="archInspectorDetail"></div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 03 · IMPLEMENTATION                                                 -->
+    <!-- =================================================================== -->
+    <section id="implementation" class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">03 · Implementation</span>
+          <h2 class="section-title">Implementation</h2>
+          <p class="section-desc">
+            Five Python 3.12 modules implement AST call-graph reachability, multi-hop IAM pathfinding and CloudTrail sequence correlation, closed-loop test-verified patching, Bedrock STRIDE reviews, and serverless API routing.
+          </p>
+        </div>
+        <span class="tag tag-pass">12 / 12 Unit Tests Passing</span>
+      </div>
+
+      <div class="module-grid">
+        <div class="module-card">
+          <div class="module-card-head">
+            <span>01 · AST TAINT &amp; CALL-GRAPH REACHABILITY</span>
+            <span style="color:#FCA5A5;">secposture/reachability_ast.py</span>
+          </div>
+          <div class="module-card-body">
+            <div class="prose-block">
+              Instead of flagging every regex match in a repository, SecPosture builds the function call graph starting from public HTTP routes (<code>@route</code>) and event handlers (<code>lambda_handler</code>), proving which sinks can actually be reached by external requests.
+            </div>
+            <div class="prose-block-tech">
+              <code>ReachabilityASTScanner.scan_source()</code> parses Python code via <code>ast.parse()</code> in <code>0.509 ms</code> median, propagates parameter taint across local assignments and helper calls, detects five CWE classes (<code>CWE-89</code> SQLi, <code>CWE-78</code> command injection, <code>CWE-918</code> SSRF, <code>CWE-502</code> pickle deserialization, and <code>CWE-798</code> hardcoded secrets), and separates <code>REACHABLE_EXPLOITABLE</code> paths from <code>UNREACHABLE_DEAD_CODE</code> helpers.
+            </div>
+          </div>
+        </div>
+
+        <div class="module-card">
+          <div class="module-card-head">
+            <span>02 · IAM ATTACK-PATH GRAPH &amp; KILL-CHAIN ENGINE</span>
+            <span style="color:#93C5FD;">secposture/attack_graph.py</span>
+          </div>
+          <div class="module-card-body">
+            <div class="prose-block">
+              SecPosture combines proactive cloud posture graph solving with active CloudTrail telemetry detection so security teams can eliminate toxic role chains before launch and catch multi-stage intrusions in flight.
+            </div>
+            <div class="prose-block-tech">
+              <code>analyze_iam_attack_paths()</code> runs Dijkstra over IAM role edges (<code>iam:PassRole</code> + <code>lambda:UpdateFunctionCode</code>, unconditioned <code>sts:AssumeRole</code>, <code>iam:AttachRolePolicy</code>, wildcard <code>s3:GetObject</code> / <code>kms:Decrypt</code>) in <code>0.021 ms</code> median and synthesizes least-privilege policies that cut crown-jewel paths from <code>4</code> to <code>0</code>. <code>detect_cloudtrail_kill_chain()</code> correlates 4 stages in <code>0.006 ms</code> median with <code>100.0%</code> precision and recall across <code>16</code> traces.
+            </div>
+          </div>
+        </div>
+
+        <div class="module-card">
+          <div class="module-card-head">
+            <span>03 · CLOSED-LOOP AUTO-PATCH &amp; /TMP TEST GATE</span>
+            <span style="color:#6EE7B7;">secposture/autopatch_loop.py</span>
+          </div>
+          <div class="module-card-body">
+            <div class="prose-block">
+              Every generated code fix is scoped strictly to reachable functions, leaving uncalled legacy helpers untouched to keep diffs small, and must pass static re-scanning plus the service's behavioral unit tests before review.
+            </div>
+            <div class="prose-block-tech">
+              <code>run_closed_loop_autopatch()</code> rewrites interpolated SQL into <code>?</code> parameter tuples, converts <code>shell=True</code> calls to <code>shell=False</code> argv lists with metacharacter guards, inserts <code>_validate_https_allowlist()</code> blocking RFC1918 and <code>169.254.169.254</code>, swaps <code>pickle.loads</code> for <code>json.loads</code>, re-scans the AST (<code>10 -&gt; 0</code> reachable flaws), and runs <code>python3 -m unittest</code> in <code>/tmp</code> (<code>67.01 ms</code> median).
+            </div>
+          </div>
+        </div>
+
+        <div class="module-card">
+          <div class="module-card-head">
+            <span>04 · BEDROCK STRIDE REVIEWER &amp; AUDIT LEDGER</span>
+            <span style="color:#FDE68A;">secposture/threat_review.py · server.py</span>
+          </div>
+          <div class="module-card-body">
+            <div class="prose-block">
+              Launch threat reviews ground Amazon Bedrock directly in deterministic AST line spans and IAM role ARNs, preventing hallucinated findings and recording every review and patch receipt in an append-only SQLite hash chain.
+            </div>
+            <div class="prose-block-tech">
+              <code>generate_appsec_threat_review()</code> compiles a 6-category STRIDE matrix and calls <code>us.amazon.nova-lite-v1:0</code> via the Bedrock Converse API (<code>1,104.0 ms</code> median across <code>8</code> benchmarked calls, <code>595</code> mean tokens). <code>SQLiteAuditLedger</code> chains every event digest from <code>GENESIS_SECPOSTURE_SQLITE_0000</code> and verifies <code>58</code> rows in <code>1.792 ms</code>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 04 · TRADE-OFFS                                                     -->
+    <!-- =================================================================== -->
+    <section id="tradeoffs" class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">04 · Trade-Offs</span>
+          <h2 class="section-title">Trade-Offs</h2>
+          <p class="section-desc">
+            SecPosture makes deliberate engineering trade-offs between static precision, diff size, LLM latency, and serverless isolation.
+          </p>
+        </div>
+        <span class="tag tag-soft">Design Decisions</span>
+      </div>
+
+      <div class="module-grid" style="margin-bottom:0;">
+        <div class="card">
+          <span class="step-badge">01 · STATIC AST VS DYNAMIC CALLS</span>
+          <h3 style="font-size:1.08rem; font-weight:800; margin:0.45rem 0;">Fast Deterministic Call Graphs vs. Dynamic Reflection</h3>
+          <p style="font-size:0.92rem; color:var(--ink-muted); line-height:1.68;">
+            Building call graphs statically with Python <code>ast</code> finishes in <code>0.509 ms</code> median without executing untrusted service code, at the trade-off that targets invoked only via dynamic <code>getattr()</code> or runtime plugin registries cannot be resolved statically without runtime trace edges.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="step-badge">02 · SURGICAL DIFFS VS DEAD-CODE CLEANUP</span>
+          <h3 style="font-size:1.08rem; font-weight:800; margin:0.45rem 0;">Patching Only Reachable Functions Keeps Code Reviews Small</h3>
+          <p style="font-size:0.92rem; color:var(--ink-muted); line-height:1.68;">
+            <code>autopatch_loop.py</code> intentionally patches only functions reachable from active entrypoints (<code>12</code> to <code>25</code> changed lines per service) and leaves dead-code helpers untouched. That minimizes merge risk for urgent security hotfixes while tracking dead-code removal separately as non-blocking backlog hygiene.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="step-badge">03 · DETERMINISTIC GATES VS MODEL FLEXIBILITY</span>
+          <h3 style="font-size:1.08rem; font-weight:800; margin:0.45rem 0;">Mandatory /tmp Unittest Verification Adds ~65 ms Per Patch</h3>
+          <p style="font-size:0.92rem; color:var(--ink-muted); line-height:1.68;">
+            Spawning an isolated <code>subprocess.run(..., shell=False)</code> test runner in <code>/tmp</code> adds <code>64.63 ms</code> median compared to returning an unverified text diff immediately. That <code>65 ms</code> budget guarantees syntax validity, <code>0</code> remaining reachable vulnerabilities, and <code>100%</code> passing unit tests before a builder ever opens a pull request.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="step-badge">04 · GROUNDED BEDROCK REVIEWS</span>
+          <h3 style="font-size:1.08rem; font-weight:800; margin:0.45rem 0;">Sub-Millisecond Graph Solvers Paired With On-Demand Nova Lite</h3>
+          <p style="font-size:0.92rem; color:var(--ink-muted); line-height:1.68;">
+            Running Amazon Bedrock on every commit line would be slow and costly. SecPosture runs AST reachability (<code>0.509 ms</code>), IAM pathfinding (<code>0.021 ms</code>), and CloudTrail correlation (<code>0.006 ms</code>) deterministically first, invoking <code>us.amazon.nova-lite-v1:0</code> (<code>1,104 ms</code> median) only for human-readable launch reviews and pull-request summaries.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 05 · LIVE DEMO                                                      -->
+    <!-- =================================================================== -->
+    <section id="studio" class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">05 · Live Demo</span>
+          <h2 class="section-title">Live Demo</h2>
+          <p class="section-desc">
+            All four tabs invoke the live AWS Lambda <code>/api/*</code> backend to run real Python AST reachability scans, synthesize and unit-test code patches inside <code>/tmp</code>, solve multi-hop IAM attack graphs and CloudTrail traces, and generate STRIDE launch reviews with Amazon Bedrock.
+          </p>
+        </div>
+        <span class="tag tag-accent">Live AWS /api/* Backend</span>
+      </div>
+
+      <div class="tab-bar" role="tablist" aria-label="SecPosture Interactive Demo Tabs">
+        <button type="button" class="tab-btn active" data-tab="reachability-scanner" role="tab" aria-selected="true" onclick="switchTab('reachability-scanner')">
+          <span class="tab-btn-eyebrow">Tab 01 · AST Taint &amp; Call Graph</span>
+          <span class="tab-btn-title">1. AST Call-Graph Reachability Scanner</span>
+          <span class="tab-btn-desc">Scan Python microservices or custom code to separate live exploitable sinks from dead-code noise</span>
+          <span class="tab-btn-metric" id="tabMetric1"></span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="autopatch-verifier" role="tab" aria-selected="false" onclick="switchTab('autopatch-verifier')">
+          <span class="tab-btn-eyebrow">Tab 02 · Closed-Loop Remediation</span>
+          <span class="tab-btn-title">2. Closed-Loop Auto-Patch &amp; Test Verifier</span>
+          <span class="tab-btn-desc">Synthesize minimal fixes, re-scan the AST, and run behavioral unittest suites in /tmp</span>
+          <span class="tab-btn-metric" id="tabMetric2"></span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="attack-path-lab" role="tab" aria-selected="false" onclick="switchTab('attack-path-lab')">
+          <span class="tab-btn-eyebrow">Tab 03 · Proactive + Defensive Cloud</span>
+          <span class="tab-btn-title">3. Multi-Hop IAM Attack-Path &amp; Kill-Chain Lab</span>
+          <span class="tab-btn-desc">Solve toxic IAM escalation paths, verify least-privilege patches, and score CloudTrail streams</span>
+          <span class="tab-btn-metric" id="tabMetric3"></span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="threat-review" role="tab" aria-selected="false" onclick="switchTab('threat-review')">
+          <span class="tab-btn-eyebrow">Tab 04 · Launch Design Review</span>
+          <span class="tab-btn-title">4. Automated AppSec Threat Review</span>
+          <span class="tab-btn-desc">Generate STRIDE matrices and live Amazon Bedrock threat models anchored to file:line &amp; ARNs</span>
+          <span class="tab-btn-metric" id="tabMetric4"></span>
+        </button>
+      </div>
+
+      <!-- TAB 1: AST CALL-GRAPH REACHABILITY SCANNER -->
+      <div id="panel-reachability-scanner" class="tab-panel active" role="tabpanel">
+        <div class="sim-header">
+          <div>
+            <h3 class="sim-title">1. AST Call-Graph Reachability Scanner</h3>
+            <p class="sim-desc">Select any sample microservice or edit the Python source code below, then run <code>POST /api/scan/reachability</code> to trace public entrypoints to dangerous sinks and filter out uncalled helper functions.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-accent" id="btnRunAstScan" onclick="runLiveReachabilityScan()">▶ Scan AST Reachability</button>
+            <button type="button" class="btn btn-secondary" onclick="sendSelectedToAutoPatch()">🛠️ Auto-Patch This Service →</button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="control-label">
+              <span>Microservice Repository Corpus (6 Services)</span>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);">Click a service to load</span>
+            </div>
+            <div class="svc-list" id="scannerServiceCards"></div>
+
+            <div class="control-label">
+              <label for="scannerSourceEditor">Live Python Source Code (Editable)</label>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);" id="scannerFilenameLabel">orders_service.py</span>
+            </div>
+            <textarea id="scannerSourceEditor" rows="12"></textarea>
+          </div>
+
+          <div class="card">
+            <div id="scanVerdictBanner" class="verdict-banner verdict-deny"></div>
+
+            <div class="gate-strip" id="scanStatsStrip"></div>
+
+            <div class="control-label">
+              <span>Reachable Exploitable Findings (Action Required)</span>
+              <span class="tag tag-fail" id="scanReachableTag">0 REACHABLE</span>
+            </div>
+            <div id="scanReachableList" style="margin-bottom:0.95rem;"></div>
+
+            <div class="control-label">
+              <span>Filtered Unreachable Dead-Code Helpers (Suppressed from Urgent Triage)</span>
+              <span class="tag tag-soft" id="scanDeadTag">0 FILTERED</span>
+            </div>
+            <div id="scanDeadList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: CLOSED-LOOP AUTO-PATCH & TEST VERIFIER -->
+      <div id="panel-autopatch-verifier" class="tab-panel" role="tabpanel">
+        <div class="sim-header">
+          <div>
+            <h3 class="sim-title">2. Closed-Loop Auto-Patch &amp; Test Verifier</h3>
+            <p class="sim-desc">Synthesize minimal remediations via <code>POST /api/patch/verify</code>, write the patched module into an isolated <code>/tmp</code> workspace, confirm <code>0</code> reachable AST flaws remain, and execute behavioral <code>unittest</code> suites.</p>
+          </div>
+          <button type="button" class="btn btn-accent" id="btnRunAutoPatch" onclick="runLiveAutoPatch()">🛠️ Generate Patch &amp; Verify Unit Tests</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="control-label">
+              <label for="patchServiceSelect">Target Vulnerable Microservice</label>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);">POST /api/patch/verify</span>
+            </div>
+            <select id="patchServiceSelect" style="margin-bottom:0.85rem;" onchange="onPatchServiceChange()">
+              <option value="orders-checkout-api">orders-checkout-api (SQLi + SSRF + Hardcoded Secret · 4 unit tests)</option>
+              <option value="artifact-build-worker">artifact-build-worker (Command Injection + Pickle RCE · 3 unit tests)</option>
+              <option value="tenant-webhook-relay">tenant-webhook-relay (SSRF + Concat SQLi · 3 unit tests)</option>
+              <option value="profile-export-lambda">profile-export-lambda (.format SQLi + CMDi + Pickle · 3 unit tests)</option>
+            </select>
+
+            <label style="display:flex; align-items:center; gap:0.55rem; border:2px solid var(--border); background:var(--bg-paper); padding:0.6rem 0.78rem; cursor:pointer; font-family:'Martian Mono',monospace; font-size:0.73rem; font-weight:700; margin-bottom:0.9rem;">
+              <input type="checkbox" id="patchIncludeBedrockCr" checked style="width:16px; height:16px; accent-color:var(--accent-main);" />
+              <span>Generate Pull-Request Security Summary via Amazon Bedrock</span>
+            </label>
+
+            <div class="control-label">
+              <span>Applied Remediation Actions</span>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);" id="patchDiffStatsLabel"></span>
+            </div>
+            <div id="patchActionsList" style="margin-bottom:0.9rem;"></div>
+
+            <div class="code-header">
+              <span>Isolated /tmp Unittest Execution Output</span>
+              <span id="patchUnittestTiming" style="color:var(--pass);">shell=False</span>
+            </div>
+            <pre class="code-box" id="patchUnittestBox" style="max-height:210px;"></pre>
+          </div>
+
+          <div class="card">
+            <div id="patchVerdictBanner" class="verdict-banner verdict-allow"></div>
+            <div class="gate-strip" id="patchGatesStrip"></div>
+
+            <div class="code-header">
+              <span>Verified Minimal Unified Diff (Reachable Functions Only)</span>
+              <span id="patchFilenameBadge" style="color:var(--accent-main);">orders_service.py</span>
+            </div>
+            <pre class="code-box" id="patchDiffBox" style="max-height:260px; margin-bottom:0.9rem;"></pre>
+
+            <div class="code-header">
+              <span>Amazon Bedrock Pull-Request Review Note</span>
+              <span id="patchBedrockBadge" style="color:var(--accent-main);">us.amazon.nova-lite-v1:0</span>
+            </div>
+            <pre class="code-box" id="patchCrSummaryBox" style="max-height:155px;"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: MULTI-HOP IAM ATTACK-PATH & KILL-CHAIN LAB -->
+      <div id="panel-attack-path-lab" class="tab-panel" role="tabpanel">
+        <div class="sim-header">
+          <div>
+            <h3 class="sim-title">3. Multi-Hop IAM Attack-Path &amp; Kill-Chain Lab</h3>
+            <p class="sim-desc">Run <code>POST /api/graph/attack-paths</code> to discover multi-hop privilege escalation paths to crown-jewel S3/KMS stores, test least-privilege IAM remediations, and evaluate CloudTrail streams for multi-stage intrusions.</p>
+          </div>
+          <button type="button" class="btn btn-accent" id="btnRunGraphLab" onclick="runLiveAttackGraphLab()">▶ Solve IAM Graph &amp; Score CloudTrail</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="control-label"><label for="graphEnvSelect">AWS Account IAM Graph Snapshot</label></div>
+            <select id="graphEnvSelect" style="margin-bottom:0.8rem;" onchange="runLiveAttackGraphLab()">
+              <option value="env-checkout-prod">env-checkout-prod (3-Hop PassRole + UpdateFunctionCode -&gt; KYC Vault)</option>
+              <option value="env-ci-pipeline">env-ci-pipeline (3-Hop Unconditioned AssumeRole -&gt; Release KMS Key)</option>
+              <option value="env-analytics-lake">env-analytics-lake (2-Hop Self-Escalation AttachRolePolicy -&gt; Ledger Lake)</option>
+              <option value="env-hardened-zero-trust">env-hardened-zero-trust (Scoped Least-Privilege Baseline · 0 Paths)</option>
+            </select>
+
+            <label style="display:flex; align-items:center; gap:0.55rem; border:2px solid var(--border); background:var(--bg-paper); padding:0.6rem 0.78rem; cursor:pointer; font-family:'Martian Mono',monospace; font-size:0.73rem; font-weight:700; margin-bottom:0.9rem;">
+              <input type="checkbox" id="graphApplyIamPatch" onchange="runLiveAttackGraphLab()" style="width:16px; height:16px; accent-color:var(--accent-main);" />
+              <span>Apply SecPosture Least-Privilege IAM Remediation &amp; Re-Solve</span>
+            </label>
+
+            <div class="control-label"><label for="graphTraceSelect">CloudTrail Event Stream Scenario</label></div>
+            <select id="graphTraceSelect" style="margin-bottom:0.9rem;" onchange="runLiveAttackGraphLab()">
+              <option value="CT-ATK-01">CT-ATK-01 · SSRF Role Harvest -&gt; PassRole Lambda -&gt; 85 KYC S3 Reads (Attack)</option>
+              <option value="CT-ATK-02">CT-ATK-02 · Build Worker SSM Sweep -&gt; AssumeRole -&gt; KMS Decrypt Spike (Attack)</option>
+              <option value="CT-ATK-03">CT-ATK-03 · Webhook AttachRolePolicy -&gt; 120 Financial Ledger Reads (Attack)</option>
+              <option value="CT-ATK-04">CT-ATK-04 · AccessDenied Burst -&gt; SecretsManager -&gt; PutBucketPolicy (Attack)</option>
+              <option value="CT-BEN-01">CT-BEN-01 · Routine Checkout Scoped S3 Receipt Read/Write (Benign Control)</option>
+              <option value="CT-BEN-02">CT-BEN-02 · Standard GitHub OIDC CI/CD Lambda Deployment (Benign Control)</option>
+              <option value="CT-BEN-03">CT-BEN-03 · Security Auditor Read-Only IAM Console Check (Benign Control)</option>
+            </select>
+
+            <div class="code-header">
+              <span>Synthesized Least-Privilege / Session Quarantine Policy</span>
+              <span id="graphSolveMsBadge">0.021 ms</span>
+            </div>
+            <pre class="code-box" id="graphPolicyBox" style="max-height:225px;"></pre>
+          </div>
+
+          <div class="card">
+            <div id="graphVerdictBanner" class="verdict-banner verdict-deny"></div>
+
+            <div class="control-label">
+              <span>Multi-Hop Privilege Escalation Paths to Crown Jewels</span>
+              <span class="tag tag-fail" id="graphPathCountTag">2 PATHS</span>
+            </div>
+            <div id="graphPathsList" style="margin-bottom:1rem;"></div>
+
+            <div class="control-label">
+              <span>CloudTrail Kill-Chain Sequence Detector</span>
+              <span class="tag tag-fail" id="killchainScoreTag">SCORE: 0.99</span>
+            </div>
+            <div id="killchainStagesBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: AUTOMATED APPSEC THREAT REVIEW -->
+      <div id="panel-threat-review" class="tab-panel" role="tabpanel">
+        <div class="sim-header">
+          <div>
+            <h3 class="sim-title">4. Automated AppSec Threat Review</h3>
+            <p class="sim-desc">Combine deterministic AST reachability and IAM attack-path proofs into a 6-category STRIDE matrix and invoke live Amazon Bedrock (<code>us.amazon.nova-lite-v1:0</code>) via <code>POST /api/threat-review</code>.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-accent" id="btnRunThreatReview" onclick="runLiveThreatReview()">🤖 Run Live Bedrock STRIDE Review</button>
+            <button type="button" class="btn btn-secondary" onclick="resetDemoState()">↺ Reset Audit Ledger</button>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:1.2rem;">
+          <div class="card">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.7rem; margin-bottom:0.8rem;">
+              <div>
+                <div class="control-label"><label for="reviewServiceSelect">Service Under Review</label></div>
+                <select id="reviewServiceSelect">
+                  <option value="orders-checkout-api">orders-checkout-api</option>
+                  <option value="artifact-build-worker">artifact-build-worker</option>
+                  <option value="tenant-webhook-relay">tenant-webhook-relay</option>
+                  <option value="profile-export-lambda">profile-export-lambda</option>
+                  <option value="ledger-reconciler-clean">ledger-reconciler-clean (Hardened)</option>
+                </select>
+              </div>
+              <div>
+                <div class="control-label"><label for="reviewEnvSelect">AWS Deployment Environment</label></div>
+                <select id="reviewEnvSelect">
+                  <option value="env-checkout-prod">env-checkout-prod</option>
+                  <option value="env-ci-pipeline">env-ci-pipeline</option>
+                  <option value="env-analytics-lake">env-analytics-lake</option>
+                  <option value="env-hardened-zero-trust">env-hardened-zero-trust</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="control-label">
+              <label for="reviewNotesInput">Builder Launch Context Notes</label>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);">Grounded in AST + IAM</span>
+            </div>
+            <textarea id="reviewNotesInput" rows="3" style="margin-bottom:0.85rem;">Launching new POST /orders/search tenant filter and partner webhook notification handler in us-west-2 production.</textarea>
+
+            <div class="code-header">
+              <span>Amazon Bedrock Launch Security Review</span>
+              <span id="reviewTelemetryBadge" style="color:var(--accent-main);">Amazon Bedrock</span>
+            </div>
+            <pre class="code-box" id="reviewNarrativeBox" style="max-height:255px;"></pre>
+          </div>
+
+          <div class="card">
+            <div id="reviewDecisionBanner" class="verdict-banner verdict-deny"></div>
+            <div class="control-label">
+              <span>Evidence-Anchored STRIDE Threat Matrix</span>
+              <span class="mono" style="font-size:0.68rem; color:var(--ink-muted);">6 Categories</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>STRIDE</th>
+                    <th>Status</th>
+                    <th>Anchored File:Line / ARN &amp; Summary</th>
+                  </tr>
+                </thead>
+                <tbody id="strideMatrixBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.65rem;">
+            <span class="mono" style="font-size:0.74rem; font-weight:700;">APPEND-ONLY SHA-256 SECURITY AUDIT LEDGER (secposture_audit.db)</span>
+            <span class="tag tag-pass" id="auditChainStatusBadge">Audit Chain: VALID</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Event ID</th>
+                  <th>Category</th>
+                  <th>Target</th>
+                  <th>Verdict</th>
+                  <th>Duration</th>
+                  <th>SHA-256 Digest</th>
+                </tr>
+              </thead>
+              <tbody id="auditLedgerBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 06 · BENCHMARKS                                                     -->
+    <!-- =================================================================== -->
+    <section id="benchmarks" class="section" style="border-bottom:none; padding-bottom:0.5rem;">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">06 · Benchmarks</span>
+          <h2 class="section-title">Benchmarks</h2>
+          <p class="section-desc" id="benchSubHeader"></p>
+        </div>
+        <span class="tag tag-pass" id="benchTimestampTag"></span>
+      </div>
+
+      <div class="overview-callout" style="margin-bottom:1.35rem;">
+        <h3>Measured Results (<code>benchmarks/latest_results.json</code>)</h3>
+        <p>
+          Across <code>6</code> Python microservices (<code>18</code> raw findings: <code>10</code> live reachable vulnerabilities and <code>8</code> uncalled dead-code helpers), AST reachability scanning finished in <code>0.509 ms</code> median (<code>1.086 ms</code> <code>p95</code>), cutting alert triage volume by <code>44.4%</code> while maintaining <code>100.0%</code> recall and precision on live paths. Closed-loop auto-patching verified <code>12 / 12</code> runs (<code>100.0%</code>), reducing reachable flaws from <code>10</code> to <code>0</code> and passing all <code>16 / 16</code> service unit tests inside <code>/tmp</code> in <code>67.01 ms</code> median (<code>98.794 ms</code> <code>p95</code>). Multi-hop IAM pathfinding solved <code>4</code> account snapshots in <code>0.021 ms</code> median (eliminating <code>4 -&gt; 0</code> crown-jewel paths), CloudTrail kill-chain detection caught <code>8 / 8</code> multi-stage intrusions with <code>0</code> false positives in <code>0.006 ms</code> median, SQLite SHA-256 verification checked <code>58</code> rows in <code>1.792 ms</code>, and <code>8</code> live Amazon Bedrock (<code>us.amazon.nova-lite-v1:0</code>) calls ran in <code>1,104.0 ms</code> median (<code>2,453.9 ms</code> <code>p95</code>, <code>595</code> mean tokens, <code>4,760</code> total tokens).
+        </p>
+      </div>
+
+      <div class="grid-equal" style="margin-bottom:1.3rem;">
+        <div class="card">
+          <div style="font-weight:800; font-size:1.04rem; margin-bottom:0.65rem;">Median Latency by Engine Stage (Log Scale)</div>
+          <div id="benchLatencySvgBox" style="border:1.5px solid var(--border); background:#FAF7F2; padding:0.5rem;"></div>
+          <div class="bar-group" id="benchMetricBars"></div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:800; font-size:1.04rem; margin-bottom:0.65rem;">AST Call-Graph Reachability Across 6 Microservices</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Raw</th>
+                  <th>Reachable</th>
+                  <th>Dead Code</th>
+                  <th>Scan p50</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="benchReachabilityBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-equal" style="margin-bottom:1.3rem;">
+        <div class="card">
+          <div style="font-weight:800; font-size:1.04rem; margin-bottom:0.65rem;">Closed-Loop Auto-Patch &amp; /tmp Unittest Verification (12 Runs)</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Verified</th>
+                  <th>Vulns</th>
+                  <th>Tests Passed</th>
+                  <th>Diff Lines</th>
+                  <th>Loop p50</th>
+                </tr>
+              </thead>
+              <tbody id="benchAutoPatchBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:800; font-size:1.04rem; margin-bottom:0.65rem;">8 Live Amazon Bedrock Threat Reviews &amp; Patch CR Notes</div>
+          <div class="table-wrap" style="max-height:330px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Call ID</th>
+                  <th>Task</th>
+                  <th>Verdict</th>
+                  <th>Latency</th>
+                  <th>Tokens</th>
+                </tr>
+              </thead>
+              <tbody id="benchBedrockBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:800; font-size:1.04rem; margin-bottom:0.65rem;">16 CloudTrail Kill-Chain &amp; Benign Control Streams (100% Precision · 100% Recall · 0 False Positives)</div>
+        <div class="table-wrap" style="max-height:320px; overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Trace ID</th>
+                <th>Scenario</th>
+                <th>Ground Truth</th>
+                <th>Detected</th>
+                <th>Kill-Chain Stages</th>
+                <th>Score</th>
+                <th>Detect ms</th>
+              </tr>
+            </thead>
+            <tbody id="benchCloudTrailBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <strong>SecPosture</strong> · Application Security Reachability, IAM Attack-Path Graph &amp; Verified Auto-Patching · Built by Ritwika Reddy Kancharla
+      </div>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+        <a href="https://d3gk5qze5xyz7y.cloudfront.net" target="_blank" rel="noopener" style="color:var(--ink); font-weight:700;">DeskPilot ↗</a>
+        <a href="https://d13kangk4fqjbf.cloudfront.net" target="_blank" rel="noopener" style="color:var(--ink); font-weight:700;">AegisOps ↗</a>
+        <a href="https://github.com/ritwikareddykancharla/secposture-appsec" target="_blank" rel="noopener" style="color:var(--ink); font-weight:700;">GitHub Repository ↗</a>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      const VALID_TABS = ["reachability-scanner", "autopatch-verifier", "attack-path-lab", "threat-review"];
+      let activeTab = "reachability-scanner";
+      let activeTheme = "light";
+
+      // Exact 1:1 measured numbers from benchmarks/latest_results.json
+      let MEASURED_BENCHMARKS = {
+        "service": "secposture-appsec",
+        "benchmark_timestamp_utc": "2026-11-25T22:37:13Z",
+        "environment": {
+          "python_version": "3.14.6",
+          "platform": "Darwin 25.6.0 (arm64)",
+          "bedrock_model": "us.amazon.nova-lite-v1:0",
+          "aws_region": "us-west-2",
+          "verification_sandbox": "Isolated /tmp workspace + AST re-scan + subprocess(shell=False) unittest",
+          "audit_store": "SQLite WAL + SHA-256 hash chain"
+        },
+        "headline_kpis": {
+          "services_scanned": 6,
+          "total_raw_findings": 18,
+          "reachable_vulns_found": 10,
+          "unreachable_dead_code_filtered": 8,
+          "alert_noise_reduction_pct": 44.4,
+          "reachable_recall_pct": 100.0,
+          "reachable_precision_pct": 100.0,
+          "ast_scan_p50_ms": 0.509,
+          "ast_scan_p95_ms": 1.086,
+          "autopatch_runs_total": 12,
+          "autopatch_runs_verified": 12,
+          "autopatch_verify_rate_pct": 100.0,
+          "service_unit_tests_passed": 16,
+          "autopatch_loop_p50_ms": 67.01,
+          "autopatch_loop_p95_ms": 98.794,
+          "unittest_sandbox_p50_ms": 64.63,
+          "iam_attack_paths_before": 4,
+          "iam_attack_paths_after_patch": 0,
+          "iam_graph_solve_p50_ms": 0.021,
+          "cloudtrail_traces_total": 16,
+          "cloudtrail_attacks_caught": 8,
+          "cloudtrail_attacks_total": 8,
+          "cloudtrail_false_positives": 0,
+          "cloudtrail_precision_pct": 100.0,
+          "cloudtrail_recall_pct": 100.0,
+          "cloudtrail_detect_p50_ms": 0.006,
+          "bedrock_calls_measured": 8,
+          "bedrock_latency_p50_ms": 1104.0,
+          "bedrock_latency_p95_ms": 2453.9,
+          "bedrock_mean_tokens": 595,
+          "bedrock_total_tokens": 4760,
+          "sqlite_worm_rows_verified": 58,
+          "sqlite_worm_verify_ms": 1.792
+        },
+        "reachability_matrix": [
+          { "service_id": "orders-checkout-api", "title": "Orders & Checkout Ledger Service", "filename": "orders_service.py", "raw_findings": 5, "reachable_vulns": 3, "dead_code_filtered": 2, "posture_score": 28, "posture_status": "BLOCK_LAUNCH", "scan_p50_ms": 1.03, "reachable_rules": ["SEC-AST-SECRET-05", "SEC-AST-SQLI-01", "SEC-AST-SSRF-03"] },
+          { "service_id": "artifact-build-worker", "title": "Artifact Checksum & Manifest Worker", "filename": "build_worker.py", "raw_findings": 4, "reachable_vulns": 2, "dead_code_filtered": 2, "posture_score": 40, "posture_status": "BLOCK_LAUNCH", "scan_p50_ms": 0.502, "reachable_rules": ["SEC-AST-CMDI-02", "SEC-AST-DESER-04"] },
+          { "service_id": "tenant-webhook-relay", "title": "Multi-Tenant Webhook Relay Service", "filename": "webhook_relay.py", "raw_findings": 4, "reachable_vulns": 2, "dead_code_filtered": 2, "posture_score": 48, "posture_status": "BLOCK_LAUNCH", "scan_p50_ms": 0.527, "reachable_rules": ["SEC-AST-SQLI-01", "SEC-AST-SSRF-03"] },
+          { "service_id": "profile-export-lambda", "title": "Customer Profile Export Lambda", "filename": "profile_export.py", "raw_findings": 4, "reachable_vulns": 3, "dead_code_filtered": 1, "posture_score": 14, "posture_status": "BLOCK_LAUNCH", "scan_p50_ms": 0.985, "reachable_rules": ["SEC-AST-CMDI-02", "SEC-AST-DESER-04", "SEC-AST-SQLI-01"] },
+          { "service_id": "ledger-reconciler-clean", "title": "Hardened Ledger Reconciler (Clean Live Path)", "filename": "reconciler_clean.py", "raw_findings": 1, "reachable_vulns": 0, "dead_code_filtered": 1, "posture_score": 98, "posture_status": "LAUNCH_READY", "scan_p50_ms": 0.426, "reachable_rules": [] },
+          { "service_id": "token-verifier-clean", "title": "Zero-Finding Session Verifier (Clean Baseline)", "filename": "token_verifier.py", "raw_findings": 0, "reachable_vulns": 0, "dead_code_filtered": 0, "posture_score": 100, "posture_status": "LAUNCH_READY", "scan_p50_ms": 0.228, "reachable_rules": [] }
+        ],
+        "autopatch_matrix": [
+          { "service_id": "orders-checkout-api", "filename": "orders_service.py", "runs": 3, "verified_runs": 3, "vulns_before": 3, "vulns_after": 0, "dead_code_untouched": 2, "unit_tests_passed": 4, "changed_lines": 25, "loop_p50_ms": 72.06, "loop_p95_ms": 73.59, "unittest_p50_ms": 68.08 },
+          { "service_id": "artifact-build-worker", "filename": "build_worker.py", "runs": 3, "verified_runs": 3, "vulns_before": 2, "vulns_after": 0, "dead_code_untouched": 2, "unit_tests_passed": 3, "changed_lines": 12, "loop_p50_ms": 96.67, "loop_p95_ms": 100.918, "unittest_p50_ms": 93.49 },
+          { "service_id": "tenant-webhook-relay", "filename": "webhook_relay.py", "runs": 3, "verified_runs": 3, "vulns_before": 2, "vulns_after": 0, "dead_code_untouched": 2, "unit_tests_passed": 3, "changed_lines": 23, "loop_p50_ms": 59.89, "loop_p95_ms": 60.844, "unittest_p50_ms": 57.04 },
+          { "service_id": "profile-export-lambda", "filename": "profile_export.py", "runs": 3, "verified_runs": 3, "vulns_before": 3, "vulns_after": 0, "dead_code_untouched": 1, "unit_tests_passed": 3, "changed_lines": 16, "loop_p50_ms": 65.36, "loop_p95_ms": 68.33, "unittest_p50_ms": 63.13 }
+        ],
+        "iam_graph_matrix": [
+          { "env_id": "env-checkout-prod", "title": "Checkout Production Account (PassRole -> Lambda -> KYC S3 Vault)", "paths_before": 2, "shortest_hops": 3, "paths_after_patch": 0, "solve_ms": 0.107, "verdict_after": "LEAST_PRIVILEGE_VERIFIED" },
+          { "env_id": "env-ci-pipeline", "title": "Artifact Build Pipeline (Unscoped AssumeRole -> Release Signing KMS)", "paths_before": 1, "shortest_hops": 3, "paths_after_patch": 0, "solve_ms": 0.054, "verdict_after": "LEAST_PRIVILEGE_VERIFIED" },
+          { "env_id": "env-analytics-lake", "title": "Webhook & Analytics Account (Self-Escalation iam:AttachRolePolicy -> Financial Lake)", "paths_before": 1, "shortest_hops": 2, "paths_after_patch": 0, "solve_ms": 0.023, "verdict_after": "LEAST_PRIVILEGE_VERIFIED" },
+          { "env_id": "env-hardened-zero-trust", "title": "Hardened Reconciler Account (Scoped Least-Privilege Baseline)", "paths_before": 0, "shortest_hops": 0, "paths_after_patch": 0, "solve_ms": 0.015, "verdict_after": "LEAST_PRIVILEGE_VERIFIED" }
+        ],
+        "cloudtrail_results": [
+          { "trace_id": "CT-ATK-01", "title": "SSRF Role Harvest -> PassRole Lambda -> Bulk KYC S3 Exfiltration", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.99, "stages": ["RECON", "CREDENTIAL_ACCESS", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.059 },
+          { "trace_id": "CT-ATK-02", "title": "Build Worker Credential Theft -> AssumeRole -> Release KMS Key Abuse", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.99, "stages": ["RECON", "CREDENTIAL_ACCESS", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.014 },
+          { "trace_id": "CT-ATK-03", "title": "Webhook Role Self-Escalation via AttachRolePolicy -> Financial Ledger Dump", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.88, "stages": ["RECON", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.009 },
+          { "trace_id": "CT-ATK-04", "title": "AccessDenied Enumeration Burst -> SecretsManager Dump -> External Bucket Policy", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.96, "stages": ["RECON", "CREDENTIAL_ACCESS", "EXFILTRATION"], "detect_ms": 0.009 },
+          { "trace_id": "CT-ATK-05", "title": "Stolen Ephemeral Session IP Hop -> PassRole EC2 -> S3 Vault Sync", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.98, "stages": ["RECON", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.01 },
+          { "trace_id": "CT-ATK-06", "title": "Cross-Role Chaining -> CreateAccessKey Persistence -> KMS Bulk Decrypt", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.99, "stages": ["RECON", "CREDENTIAL_ACCESS", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.008 },
+          { "trace_id": "CT-ATK-07", "title": "SSM Parameter Sweep -> Lambda Env Tamper -> Financial S3 Exfiltration", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.99, "stages": ["RECON", "CREDENTIAL_ACCESS", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.008 },
+          { "trace_id": "CT-ATK-08", "title": "Recon Enumeration -> PutRolePolicy Inline Admin -> Crown S3 Read", "ground_truth": "ATTACK", "detected": true, "anomaly_score": 0.99, "stages": ["RECON", "CREDENTIAL_ACCESS", "LATERAL_MOVEMENT", "EXFILTRATION"], "detect_ms": 0.007 },
+          { "trace_id": "CT-BEN-01", "title": "Routine Checkout Service Scoped S3 Receipt Read/Write (Internal VPC)", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.22, "stages": ["CREDENTIAL_ACCESS"], "detect_ms": 0.005 },
+          { "trace_id": "CT-BEN-02", "title": "Standard GitHub OIDC CI/CD Lambda Deployment (Consistent Deploy Runner)", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.44, "stages": ["RECON", "LATERAL_MOVEMENT"], "detect_ms": 0.004 },
+          { "trace_id": "CT-BEN-03", "title": "Engineer Read-Only IAM Console Inspection (Single Stage Recon Only)", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.22, "stages": ["RECON"], "detect_ms": 0.005 },
+          { "trace_id": "CT-BEN-04", "title": "Scheduled Reconciler Batch Reading Scoped Staging Bucket", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.0, "stages": [], "detect_ms": 0.004 },
+          { "trace_id": "CT-BEN-05", "title": "Developer CLI Single AccessDenied Typo Without Escalation or Exfil", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.22, "stages": ["RECON"], "detect_ms": 0.004 },
+          { "trace_id": "CT-BEN-06", "title": "Cold-Start Lambda Secret Fetch Only (No Recon, Lateral, or S3 Burst)", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.22, "stages": ["CREDENTIAL_ACCESS"], "detect_ms": 0.002 },
+          { "trace_id": "CT-BEN-07", "title": "CloudFront Invalidation & Static Web S3 Sync During Release", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.0, "stages": [], "detect_ms": 0.003 },
+          { "trace_id": "CT-BEN-08", "title": "Cross-Account Metrics Exporter Assuming Telemetry Role Only", "ground_truth": "BENIGN", "detected": false, "anomaly_score": 0.22, "stages": ["LATERAL_MOVEMENT"], "detect_ms": 0.004 }
+        ],
+        "bedrock_call_results": [
+          { "call_id": "BR-STRIDE-orders-checkout-api", "task_type": "STRIDE Launch Threat Review", "target": "orders-checkout-api", "decision": "BLOCK_LAUNCH_UNTIL_PATCHED", "latency_ms": 2346.0, "tokens": 600 },
+          { "call_id": "BR-STRIDE-artifact-build-worker", "task_type": "STRIDE Launch Threat Review", "target": "artifact-build-worker", "decision": "BLOCK_LAUNCH_UNTIL_PATCHED", "latency_ms": 1747.0, "tokens": 439 },
+          { "call_id": "BR-STRIDE-tenant-webhook-relay", "task_type": "STRIDE Launch Threat Review", "target": "tenant-webhook-relay", "decision": "BLOCK_LAUNCH_UNTIL_PATCHED", "latency_ms": 2512.0, "tokens": 391 },
+          { "call_id": "BR-STRIDE-profile-export-lambda", "task_type": "STRIDE Launch Threat Review", "target": "profile-export-lambda", "decision": "BLOCK_LAUNCH_UNTIL_PATCHED", "latency_ms": 1410.0, "tokens": 598 },
+          { "call_id": "BR-PATCHCR-orders-checkout-api", "task_type": "Verified Auto-Patch CR Note", "target": "orders-checkout-api", "decision": "VERIFIED_READY_FOR_CR", "latency_ms": 798.0, "tokens": 699 },
+          { "call_id": "BR-PATCHCR-artifact-build-worker", "task_type": "Verified Auto-Patch CR Note", "target": "artifact-build-worker", "decision": "VERIFIED_READY_FOR_CR", "latency_ms": 786.0, "tokens": 716 },
+          { "call_id": "BR-PATCHCR-tenant-webhook-relay", "task_type": "Verified Auto-Patch CR Note", "target": "tenant-webhook-relay", "decision": "VERIFIED_READY_FOR_CR", "latency_ms": 529.0, "tokens": 639 },
+          { "call_id": "BR-PATCHCR-profile-export-lambda", "task_type": "Verified Auto-Patch CR Note", "target": "profile-export-lambda", "decision": "VERIFIED_READY_FOR_CR", "latency_ms": 741.0, "tokens": 678 }
+        ]
+      };
+
+      const ARCH_NODE_DETAILS = {
+        "edge-browser": {
+          plane: "Layer ① · Browser & Serverless Edge",
+          title: "AppSec Workbench UI",
+          module: "web/index.html",
+          summary: "Interactive four-tab security console for AST reachability triage, closed-loop auto-patching, IAM attack-path modeling, and Bedrock STRIDE threat reviews. Persists tab and theme state via URL hash with zero external JS libraries.",
+          metric: "4 Live Security Views · URL Hash State"
+        },
+        "edge-cloudfront": {
+          plane: "Layer ① · Browser & Serverless Edge",
+          title: "Amazon CloudFront HTTPS Edge",
+          module: "infra/deploy_cloudfront.sh · Origin Access Control",
+          summary: "Routes static web assets from private S3 and forwards /api/* POST and GET calls directly to the Python 3.12 AWS Lambda Function URL on a single HTTPS origin.",
+          metric: "TLS 1.3 · Unified /api/* Routing"
+        },
+        "edge-s3": {
+          plane: "Layer ① · Browser & Serverless Edge",
+          title: "Private Amazon S3 Bucket (OAC)",
+          module: "s3://secposture-web-796330847946-us-west-2",
+          summary: "Holds static UI files with all four S3 BlockPublicAccess settings enabled, permitting SigV4 reads solely from the CloudFront distribution.",
+          metric: "Public Access Blocked · $0 Idle Cost"
+        },
+        "edge-lambda": {
+          plane: "Layer ① · Browser & Serverless Edge",
+          title: "AWS Lambda Python 3.12 API",
+          module: "secposture/server.py :: lambda_handler",
+          summary: "Executes AST reachability scans, isolated /tmp unittest patch verification, IAM graph pathfinding, CloudTrail correlation, and Bedrock Converse API calls on demand.",
+          metric: "Python 3.12 · 512 MB · 30s Timeout"
+        },
+        "ast-scanner": {
+          plane: "Layer ② · Reachability & Cloud Analyzers",
+          title: "AST Call-Graph & Taint Scanner",
+          module: "secposture/reachability_ast.py :: ReachabilityASTScanner",
+          summary: "Parses Python code via ast.parse, discovers @route and lambda_handler entrypoints, propagates untrusted parameter taint across helper calls, and separates live exploitable sinks from uncalled dead-code helpers.",
+          metric: "0.509 ms Median · 44.4% Noise Filtered · 100% Recall"
+        },
+        "iam-graph": {
+          plane: "Layer ② · Reachability & Cloud Analyzers",
+          title: "Multi-Hop IAM Attack-Path Solver",
+          module: "secposture/attack_graph.py :: analyze_iam_attack_paths",
+          summary: "Builds a weighted directed privilege graph across AWS roles, policies (iam:PassRole, sts:AssumeRole, iam:AttachRolePolicy, wildcard s3:GetObject), and crown-jewel buckets, computing shortest escalation paths and least-privilege fixes.",
+          metric: "0.021 ms Median · 4 -> 0 Crown-Jewel Paths"
+        },
+        "cloudtrail-detector": {
+          plane: "Layer ② · Reachability & Cloud Analyzers",
+          title: "Stateful CloudTrail Kill-Chain Detector",
+          module: "secposture/attack_graph.py :: detect_cloudtrail_kill_chain",
+          summary: "Tracks per-principal temporal progression across Recon, Credential Access, Lateral Movement, and Exfiltration combined with IP novelty and AccessDenied bursts, emitting session quarantine policies.",
+          metric: "8 / 8 Intrusions Caught · 0 False Positives · 0.006 ms"
+        },
+        "autopatch-synth": {
+          plane: "Layer ③ · Closed-Loop Auto-Patching",
+          title: "Minimal Code & IAM Patch Synthesizer",
+          module: "secposture/autopatch_loop.py :: synthesize_minimal_patch",
+          summary: "Generates targeted fixes strictly on reachable vulnerable functions: '?' SQL parameter bindings, shell=False argv arrays, _validate_https_allowlist() blocking 169.254.169.254, json.loads(), and os.environ secret lookups.",
+          metric: "12-25 Diff Lines · Dead Code Untouched"
+        },
+        "tmp-verifier": {
+          plane: "Layer ③ · Closed-Loop Auto-Patching",
+          title: "Isolated /tmp AST Re-Scan & Unittest Gate",
+          module: "secposture/autopatch_loop.py :: run_closed_loop_autopatch",
+          summary: "Writes patched service code and behavioral tests into an isolated /tmp directory, verifies ast.parse() syntax, confirms 0 reachable vulnerabilities remain, and runs python3 -m unittest with shell=False.",
+          metric: "12 / 12 Verified · 16 / 16 Unit Tests Passing · 67.01 ms"
+        },
+        "bedrock-stride": {
+          plane: "Layer ④ · Bedrock AI & Audit Ledger",
+          title: "Amazon Bedrock STRIDE Threat Modeler",
+          module: "secposture/threat_review.py :: generate_appsec_threat_review",
+          summary: "Combines deterministic AST file:line findings and IAM attack paths into a 6-row STRIDE matrix and invokes Amazon Nova Lite (us.amazon.nova-lite-v1:0) via Converse API for launch decisions and CR summaries.",
+          metric: "1,104 ms Median · 595 Mean Tokens (8 Live Calls)"
+        },
+        "sqlite-ledger": {
+          plane: "Layer ④ · Bedrock AI & Audit Ledger",
+          title: "SHA-256 Hash-Chained Security Ledger",
+          module: "secposture/audit_ledger.py :: SQLiteAuditLedger",
+          summary: "Persists every AST scan, patch verification gate, IAM graph check, and Bedrock threat review into SQLite WAL chained from GENESIS_SECPOSTURE_SQLITE_0000 so tampered history is immediately caught.",
+          metric: "58 Rows Verified in 1.792 ms"
+        }
+      };
+
+      const state = {
+        services: [],
+        selectedServiceId: "orders-checkout-api",
+        sourceModifiedManually: false,
+        auditEvents: []
+      };
+
+      function esc(v) {
+        return String(v == null ? "" : v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      // Architecture SVG Inspector, Zoom & Export
+      function selectArchNode(nodeId) {
+        const info = ARCH_NODE_DETAILS[nodeId] || ARCH_NODE_DETAILS["ast-scanner"];
+        document.querySelectorAll("#secpostureArchSvg .arch-node").forEach(function (el) {
+          el.classList.toggle("selected", el.getAttribute("data-arch-node") === nodeId);
+        });
+        document.querySelectorAll("#archNodePills [data-arch-btn]").forEach(function (btn) {
+          btn.classList.toggle("active", btn.getAttribute("data-arch-btn") === nodeId);
+        });
+        const detailBox = document.getElementById("archInspectorDetail");
+        if (detailBox) {
+          detailBox.innerHTML =
+            '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.45rem;">' +
+              '<div>' +
+                '<span class="tag tag-accent" style="margin-bottom:0.35rem;">' + esc(info.plane) + '</span>' +
+                '<h3 style="font-size:1.06rem; font-weight:800;">' + esc(info.title) + '</h3>' +
+              '</div>' +
+              '<span class="tag tag-pass">' + esc(info.metric) + '</span>' +
+            '</div>' +
+            '<div class="mono" style="font-size:0.73rem; color:var(--accent-main); margin-bottom:0.45rem;">Module / Resource: <code>' + esc(info.module) + '</code></div>' +
+            '<p style="font-size:0.91rem; color:var(--ink-muted); line-height:1.65;">' + esc(info.summary) + '</p>';
+        }
+      }
+
+      document.querySelectorAll("#secpostureArchSvg .arch-node").forEach(function (el) {
+        el.addEventListener("click", function () { selectArchNode(el.getAttribute("data-arch-node")); });
+        el.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            selectArchNode(el.getAttribute("data-arch-node"));
+          }
+        });
+      });
+      document.querySelectorAll("#archNodePills [data-arch-btn]").forEach(function (btn) {
+        btn.addEventListener("click", function () { selectArchNode(btn.getAttribute("data-arch-btn")); });
+      });
+
+      const archSvg = document.getElementById("secpostureArchSvg");
+      const archViewport = document.getElementById("archViewport");
+      const zoom100Btn = document.getElementById("zoom100Btn");
+      const zoom125Btn = document.getElementById("zoom125Btn");
+      const zoomResetBtn = document.getElementById("zoomResetBtn");
+      const archZoomLabel = document.getElementById("archZoomLabel");
+
+      function setArchZoom(mode) {
+        if (!archSvg) return;
+        const is125 = mode === "125";
+        archSvg.classList.toggle("zoom-125", is125);
+        archZoomLabel.textContent = is125 ? "Zoom: 125%" : "Zoom: 100%";
+        zoom100Btn.className = is125 ? "btn btn-secondary" : "btn btn-accent";
+        zoom125Btn.className = is125 ? "btn btn-accent" : "btn btn-secondary";
+        if (mode === "reset" && archViewport) {
+          archViewport.scrollTo({ left: 0, behavior: "smooth" });
+          selectArchNode("ast-scanner");
+        }
+      }
+      zoom100Btn.addEventListener("click", function () { setArchZoom("100"); });
+      zoom125Btn.addEventListener("click", function () { setArchZoom("125"); });
+      zoomResetBtn.addEventListener("click", function () { setArchZoom("reset"); });
+
+      document.getElementById("downloadArchSvgBtn").addEventListener("click", function () {
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + archSvg.outerHTML;
+        const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "secposture-architecture.svg";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      });
+
+      // Scroll-Spy Section TOC
+      const sectionIds = ["problem", "architecture", "implementation", "tradeoffs", "studio", "benchmarks"];
+      function updateScrollSpy() {
+        let current = "problem";
+        const offset = window.scrollY + 180;
+        for (let i = 0; i < sectionIds.length; i++) {
+          const sec = document.getElementById(sectionIds[i]);
+          if (sec && sec.offsetTop <= offset) {
+            current = sectionIds[i];
+          }
+        }
+        document.querySelectorAll("#sectionTocLinks [data-toc-sec]").forEach(function (link) {
+          link.classList.toggle("active", link.getAttribute("data-toc-sec") === current);
+        });
+      }
+      window.addEventListener("scroll", updateScrollSpy, { passive: true });
+
+      // Hash-based URL state & theme toggle
+      function parseHashState() {
+        const raw = (window.location.hash || "").replace(/^#/, "");
+        if (!raw) return;
+        raw.split("&").forEach(function (part) {
+          if (VALID_TABS.includes(part)) activeTab = part;
+          else if (part === "theme=dark" || part === "dark") activeTheme = "dark";
+          else if (part === "theme=light") activeTheme = "light";
+        });
+      }
+
+      function syncHashState() {
+        const hash = activeTheme === "dark" ? activeTab + "&theme=dark" : activeTab;
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, "", "#" + hash);
+        } else {
+          window.location.hash = hash;
+        }
+      }
+
+      function applyTheme(theme) {
+        activeTheme = theme;
+        document.documentElement.setAttribute("data-theme", theme);
+        document.getElementById("themeIcon").textContent = theme === "dark" ? "☀️" : "🌙";
+        document.getElementById("themeLabel").textContent = theme === "dark" ? "Light Mode" : "Dark Mode";
+        syncHashState();
+      }
+
+      document.getElementById("themeToggleBtn").addEventListener("click", function () {
+        applyTheme(activeTheme === "dark" ? "light" : "dark");
+      });
+
+      window.switchTab = function (tabId) {
+        if (!VALID_TABS.includes(tabId)) return;
+        activeTab = tabId;
+        document.querySelectorAll(".tab-btn").forEach(function (btn) {
+          const match = btn.getAttribute("data-tab") === tabId;
+          btn.classList.toggle("active", match);
+          btn.setAttribute("aria-selected", match ? "true" : "false");
+        });
+        document.querySelectorAll(".tab-panel").forEach(function (panel) {
+          panel.classList.toggle("active", panel.id === "panel-" + tabId);
+        });
+        syncHashState();
+      };
+
+      async function apiGet(path) {
+        const res = await fetch(path, { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      }
+
+      async function apiPost(path, body) {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(body || {})
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+        return data;
+      }
+
+      function renderMeasuredKpisAndBenchmarks() {
+        const k = MEASURED_BENCHMARKS.headline_kpis;
+
+        document.getElementById("heroKpiStrip").innerHTML =
+          '<div class="card kpi-card">' +
+            '<div class="kpi-val">' + k.alert_noise_reduction_pct + '% Noise Cut</div>' +
+            '<div class="kpi-label">' + k.reachable_vulns_found + ' / ' + k.reachable_vulns_found + ' Live Flaws (' + Math.round(k.reachable_recall_pct) + '% Recall)</div>' +
+            '<div class="kpi-sub"><em>Filtered ' + k.unreachable_dead_code_filtered + ' / ' + k.total_raw_findings + ' dead-code alerts across ' + k.services_scanned + ' repos in ' + k.ast_scan_p50_ms + ' ms median</em></div>' +
+          '</div>' +
+          '<div class="card kpi-card">' +
+            '<div class="kpi-val">' + k.autopatch_runs_verified + ' / ' + k.autopatch_runs_total + ' Verified</div>' +
+            '<div class="kpi-label">Closed-Loop Auto-Patch + Unittest</div>' +
+            '<div class="kpi-sub"><em>Reduced reachable flaws ' + k.reachable_vulns_found + ' -&gt; 0 and passed ' + k.service_unit_tests_passed + ' / ' + k.service_unit_tests_passed + ' tests in ' + k.autopatch_loop_p50_ms + ' ms</em></div>' +
+          '</div>' +
+          '<div class="card kpi-card">' +
+            '<div class="kpi-val">' + k.iam_attack_paths_before + ' -&gt; ' + k.iam_attack_paths_after_patch + ' IAM Paths</div>' +
+            '<div class="kpi-label">' + k.cloudtrail_attacks_caught + ' / ' + k.cloudtrail_attacks_total + ' Kill Chains Caught (0 FP)</div>' +
+            '<div class="kpi-sub"><em>Solved role graphs in ' + k.iam_graph_solve_p50_ms + ' ms and 16 CloudTrail streams in ' + k.cloudtrail_detect_p50_ms + ' ms</em></div>' +
+          '</div>' +
+          '<div class="card kpi-card">' +
+            '<div class="kpi-val">' + Math.round(k.bedrock_latency_p50_ms).toLocaleString() + ' ms</div>' +
+            '<div class="kpi-label">Amazon Bedrock STRIDE Reviews</div>' +
+            '<div class="kpi-sub"><em>Measured across ' + k.bedrock_calls_measured + ' live Nova Lite calls (' + k.bedrock_mean_tokens + ' mean tokens/call)</em></div>' +
+          '</div>';
+
+        document.getElementById("tabMetric1").textContent =
+          k.alert_noise_reduction_pct + "% Dead Code Filtered · " + k.ast_scan_p50_ms + " ms p50";
+        document.getElementById("tabMetric2").textContent =
+          k.autopatch_runs_verified + " / " + k.autopatch_runs_total + " Verified · " + k.autopatch_loop_p50_ms + " ms p50";
+        document.getElementById("tabMetric3").textContent =
+          k.iam_attack_paths_before + " -> " + k.iam_attack_paths_after_patch + " Paths · " + k.cloudtrail_attacks_caught + " / " + k.cloudtrail_attacks_total + " Kill Chains";
+        document.getElementById("tabMetric4").textContent =
+          k.bedrock_calls_measured + " Live Bedrock Calls · " + Math.round(k.bedrock_latency_p50_ms) + " ms p50";
+
+        document.getElementById("benchSubHeader").textContent =
+          "Measured by benchmarks/run_benchmarks.py across " + k.services_scanned + " Python microservices, " + k.autopatch_runs_total + " isolated /tmp auto-patch + unittest runs, " + k.cloudtrail_traces_total + " CloudTrail traces, " + k.bedrock_calls_measured + " live Amazon Bedrock calls, and " + k.sqlite_worm_rows_verified + " SHA-256 audit rows in " + MEASURED_BENCHMARKS.environment.aws_region + ".";
+        document.getElementById("benchTimestampTag").textContent = MEASURED_BENCHMARKS.benchmark_timestamp_utc;
+
+        const stages = [
+          { label: "CloudTrail Detect", p50: k.cloudtrail_detect_p50_ms, color: "#059669" },
+          { label: "IAM Graph Solve", p50: k.iam_graph_solve_p50_ms, color: "#1D4ED8" },
+          { label: "AST Reachability", p50: k.ast_scan_p50_ms, color: "#6D28D9" },
+          { label: "SQLite Hash Verify", p50: k.sqlite_worm_verify_ms, color: "#D97706" },
+          { label: "Auto-Patch + Tests", p50: k.autopatch_loop_p50_ms, color: "#B91C1C" },
+          { label: "Bedrock STRIDE", p50: k.bedrock_latency_p50_ms, color: "#18181B" }
+        ];
+        function logW(ms) {
+          const val = Math.max(0.004, ms);
+          const pct = ((Math.log10(val) - Math.log10(0.004)) / (Math.log10(2600) - Math.log10(0.004))) * 330;
+          return Math.max(8, Math.min(330, +pct.toFixed(1)));
+        }
+        let svgRows = "";
+        stages.forEach(function (st, i) {
+          const y = 22 + i * 32;
+          svgRows +=
+            '<text x="12" y="' + (y + 13) + '" font-family="monospace" font-size="10.5" font-weight="700" fill="#141413">' + esc(st.label) + '</text>' +
+            '<rect x="164" y="' + y + '" width="330" height="16" fill="#F2ECE1" stroke="#18181B" stroke-width="1.2"/>' +
+            '<rect x="164" y="' + y + '" width="' + logW(st.p50) + '" height="16" fill="' + st.color + '"/>' +
+            '<text x="502" y="' + (y + 12) + '" font-family="monospace" font-size="10" fill="#141413">p50: ' + st.p50 + ' ms</text>';
+        });
+        document.getElementById("benchLatencySvgBox").innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 615 218" style="width:100%; height:auto; display:block;">' +
+          '<rect width="615" height="218" fill="#FAF7F2"/>' + svgRows + '</svg>';
+
+        document.getElementById("benchMetricBars").innerHTML =
+          '<div class="bar-row"><div class="bar-meta"><span>Closed-Loop Auto-Patch + Unittest Verified (' + k.autopatch_runs_verified + ' / ' + k.autopatch_runs_total + ')</span><span>' + k.autopatch_verify_rate_pct.toFixed(0) + '%</span></div><div class="bar-track"><div class="bar-fill bar-fill-pass" style="width:' + k.autopatch_verify_rate_pct + '%;"></div></div></div>' +
+          '<div class="bar-row"><div class="bar-meta"><span>CloudTrail Kill-Chain Precision &amp; Recall (' + k.cloudtrail_attacks_caught + ' / ' + k.cloudtrail_attacks_total + ' · 0 FP)</span><span>' + k.cloudtrail_recall_pct.toFixed(0) + '%</span></div><div class="bar-track"><div class="bar-fill bar-fill-accent" style="width:' + k.cloudtrail_recall_pct + '%;"></div></div></div>';
+
+        document.getElementById("benchReachabilityBody").innerHTML = MEASURED_BENCHMARKS.reachability_matrix.map(function (r) {
+          const ok = r.posture_status === "LAUNCH_READY";
+          return (
+            "<tr>" +
+              "<td><strong>" + esc(r.service_id) + "</strong><div class='mono' style='font-size:0.67rem; color:var(--ink-muted);'>" + esc(r.filename) + "</div></td>" +
+              "<td class='mono'>" + r.raw_findings + "</td>" +
+              "<td class='mono' style='font-weight:700; color:" + (r.reachable_vulns ? "var(--fail)" : "var(--pass)") + ";'>" + r.reachable_vulns + "</td>" +
+              "<td class='mono'>" + r.dead_code_filtered + "</td>" +
+              "<td class='mono'>" + r.scan_p50_ms + " ms</td>" +
+              "<td><span class='tag " + (ok ? "tag-pass" : "tag-fail") + "'>" + esc(r.posture_status) + "</span></td>" +
+            "</tr>"
+          );
+        }).join("");
+
+        document.getElementById("benchAutoPatchBody").innerHTML = MEASURED_BENCHMARKS.autopatch_matrix.map(function (p) {
+          return (
+            "<tr>" +
+              "<td class='mono'><strong>" + esc(p.service_id) + "</strong></td>" +
+              "<td><span class='tag tag-pass'>" + p.verified_runs + "/" + p.runs + "</span></td>" +
+              "<td class='mono'>" + p.vulns_before + " -&gt; <strong>" + p.vulns_after + "</strong></td>" +
+              "<td class='mono' style='color:var(--pass); font-weight:700;'>" + p.unit_tests_passed + " / " + p.unit_tests_passed + "</td>" +
+              "<td class='mono'>" + p.changed_lines + " ln</td>" +
+              "<td class='mono'><strong>" + p.loop_p50_ms + " ms</strong></td>" +
+            "</tr>"
+          );
+        }).join("");
+
+        document.getElementById("benchBedrockBody").innerHTML = MEASURED_BENCHMARKS.bedrock_call_results.map(function (b) {
+          const isPass = b.decision === "VERIFIED_READY_FOR_CR";
+          return (
+            "<tr>" +
+              "<td class='mono' style='font-size:0.68rem;'><strong>" + esc(b.call_id) + "</strong></td>" +
+              "<td>" + esc(b.task_type) + "</td>" +
+              "<td><span class='tag " + (isPass ? "tag-pass" : "tag-warn") + "'>" + esc(b.decision) + "</span></td>" +
+              "<td class='mono'>" + b.latency_ms + " ms</td>" +
+              "<td class='mono'>" + b.tokens + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+
+        document.getElementById("benchCloudTrailBody").innerHTML = MEASURED_BENCHMARKS.cloudtrail_results.map(function (c) {
+          const isAtk = c.ground_truth === "ATTACK";
+          return (
+            "<tr>" +
+              "<td class='mono'><strong>" + esc(c.trace_id) + "</strong></td>" +
+              "<td>" + esc(c.title) + "</td>" +
+              "<td><span class='tag " + (isAtk ? "tag-fail" : "tag-soft") + "'>" + esc(c.ground_truth) + "</span></td>" +
+              "<td><span class='tag " + (c.detected ? "tag-fail" : "tag-pass") + "'>" + (c.detected ? "ALERT_FIRED" : "CLEAN_ALLOW") + "</span></td>" +
+              "<td class='mono' style='font-size:0.68rem;'>" + esc(c.stages.join(" -> ") || "NONE") + "</td>" +
+              "<td class='mono'><strong>" + c.anomaly_score + "</strong></td>" +
+              "<td class='mono'>" + c.detect_ms + " ms</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      document.getElementById("scannerSourceEditor").addEventListener("input", function () {
+        state.sourceModifiedManually = true;
+      });
+
+      function renderServiceCards() {
+        const list = state.services.length ? state.services : MEASURED_BENCHMARKS.reachability_matrix;
+        document.getElementById("scannerServiceCards").innerHTML = list.map(function (s) {
+          const sel = s.service_id === state.selectedServiceId;
+          const rCount = s.reachable_count != null ? s.reachable_count : s.reachable_vulns;
+          const uCount = s.unreachable_count != null ? s.unreachable_count : s.dead_code_filtered;
+          return (
+            '<div class="svc-card' + (sel ? " selected" : "") + '" onclick="selectScannerService(\'' + esc(s.service_id) + '\')">' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">' +
+                '<div><strong>' + esc(s.title) + '</strong> <span class="mono" style="font-size:0.69rem; color:var(--ink-muted);">(' + esc(s.filename) + ')</span></div>' +
+                '<span class="tag ' + (rCount > 0 ? "tag-fail" : "tag-pass") + '">' + rCount + ' Reachable · ' + uCount + ' Dead</span>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join("");
+      }
+
+      window.selectScannerService = function (serviceId) {
+        state.selectedServiceId = serviceId;
+        state.sourceModifiedManually = false;
+        const found = state.services.find(function (x) { return x.service_id === serviceId; });
+        if (found && found.source_code) {
+          document.getElementById("scannerSourceEditor").value = found.source_code;
+          document.getElementById("scannerFilenameLabel").textContent = found.filename;
+        }
+        renderServiceCards();
+        runLiveReachabilityScan();
+      };
+
+      function renderReachabilityResult(res) {
+        const banner = document.getElementById("scanVerdictBanner");
+        const hasReachable = res.reachable_count > 0;
+        banner.className = "verdict-banner " + (hasReachable ? "verdict-deny" : "verdict-allow");
+        banner.innerHTML =
+          "<div><strong>" + (hasReachable ? "🛑 LAUNCH BLOCKED: " + res.reachable_count + " REACHABLE VULNERABILITIES" : "✅ LAUNCH READY: 0 REACHABLE VULNERABILITIES") + "</strong><br/>" +
+          "<span style='font-size:0.83rem;'>Scanned <code>" + esc(res.filename) + "</code> (" + res.total_functions + " functions, " + res.entrypoints.length + " public entrypoints) in <strong>" + res.scan_ms + " ms</strong>. Filtered " + res.unreachable_count + " unreachable dead-code helper(s).</span></div>" +
+          "<span class='tag " + (hasReachable ? "tag-fail" : "tag-pass") + "'>Posture: " + res.posture_score + "/100</span>";
+
+        document.getElementById("scanStatsStrip").innerHTML =
+          '<div class="gate-pill"><div>Entrypoints</div><strong style="font-size:0.9rem;">' + res.entrypoints.length + ' Public</strong></div>' +
+          '<div class="gate-pill"><div>Reachable Sinks</div><strong style="font-size:0.9rem; color:' + (hasReachable ? "var(--fail)" : "var(--pass)") + ';">' + res.reachable_count + ' Exploitable</strong></div>' +
+          '<div class="gate-pill"><div>Noise Reduction</div><strong style="font-size:0.9rem; color:var(--pass);">' + res.alert_noise_reduction_pct + '% (' + res.unreachable_count + ' Dead)</strong></div>';
+
+        document.getElementById("scanReachableTag").textContent = res.reachable_count + " REACHABLE";
+        document.getElementById("scanDeadTag").textContent = res.unreachable_count + " FILTERED";
+
+        document.getElementById("scanReachableList").innerHTML = res.reachable_findings.length
+          ? res.reachable_findings.map(function (f) {
+              return (
+                '<div class="finding-item">' +
+                  '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.25rem;">' +
+                    '<strong>' + esc(f.category) + '</strong>' +
+                    '<span class="tag tag-fail">' + esc(f.rule_id) + ' · ' + esc(f.cwe) + ' · ' + esc(f.location) + '</span>' +
+                  '</div>' +
+                  '<div class="mono" style="font-size:0.69rem; color:var(--accent-main); margin-bottom:0.22rem;">Call Chain: ' + esc(f.call_chain.join(" -> ")) + '</div>' +
+                  '<div class="mono" style="font-size:0.68rem; color:var(--ink-muted);">Taint: ' + esc(f.taint_summary) + '</div>' +
+                '</div>'
+              );
+            }).join("")
+          : '<div class="finding-item" style="border-color:var(--pass);"><strong style="color:var(--pass);">✓ Zero reachable vulnerabilities from public HTTP or Lambda entrypoints.</strong></div>';
+
+        document.getElementById("scanDeadList").innerHTML = res.unreachable_findings.length
+          ? res.unreachable_findings.map(function (f) {
+              return (
+                '<div class="finding-item" style="opacity:0.86;">' +
+                  '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap;">' +
+                    '<span class="mono" style="font-size:0.72rem; font-weight:700;">' + esc(f.function_name) + '() · ' + esc(f.location) + '</span>' +
+                    '<span class="tag tag-soft">UNREACHABLE_DEAD_CODE (' + esc(f.cwe) + ')</span>' +
+                  '</div>' +
+                  '<div class="mono" style="font-size:0.68rem; color:var(--ink-muted); margin-top:0.18rem;">Zero call paths from any @route or lambda_handler entrypoint.</div>' +
+                '</div>'
+              );
+            }).join("")
+          : '<div class="mono" style="font-size:0.72rem; color:var(--ink-muted);">No dead-code helpers present in this module.</div>';
+      }
+
+      window.runLiveReachabilityScan = async function () {
+        const btn = document.getElementById("btnRunAstScan");
+        btn.disabled = true;
+        try {
+          const editorVal = document.getElementById("scannerSourceEditor").value;
+          const payload = state.sourceModifiedManually && editorVal.trim()
+            ? { service_id: "custom-edited", source_code: editorVal, filename: document.getElementById("scannerFilenameLabel").textContent || "custom.py" }
+            : { service_id: state.selectedServiceId };
+          const out = await apiPost("/api/scan/reachability", payload);
+          renderReachabilityResult(out);
+          await refreshLedgerOnly();
+        } catch (err) {
+          document.getElementById("scanReachableList").innerHTML = '<div class="finding-item">Error: ' + esc(err.message) + '</div>';
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      window.sendSelectedToAutoPatch = function () {
+        const sel = document.getElementById("patchServiceSelect");
+        const validPatchIds = ["orders-checkout-api", "artifact-build-worker", "tenant-webhook-relay", "profile-export-lambda"];
+        if (validPatchIds.includes(state.selectedServiceId)) {
+          sel.value = state.selectedServiceId;
+        }
+        switchTab("autopatch-verifier");
+        runLiveAutoPatch();
+      };
+
+      window.onPatchServiceChange = function () {
+        runLiveAutoPatch();
+      };
+
+      function renderAutoPatchResult(out) {
+        const banner = document.getElementById("patchVerdictBanner");
+        banner.className = "verdict-banner " + (out.verified ? "verdict-allow" : "verdict-deny");
+        banner.innerHTML =
+          "<div><strong>" + (out.verified ? "✅ PATCH VERIFIED & READY FOR CODE REVIEW (" + out.total_loop_ms + " ms)" : "🛑 PATCH VERIFICATION FAILED") + "</strong><br/>" +
+          "<span style='font-size:0.83rem;'>Posture improved from <strong>" + out.posture_score_before + "/100</strong> to <strong>" + out.posture_score_after + "/100</strong> across <code>" + esc(out.filename) + "</code> while leaving " + out.gates.dead_code_untouched + " dead-code helper(s) untouched.</span></div>" +
+          "<span class='tag " + (out.verified ? "tag-pass" : "tag-fail") + "'>" + esc(out.status) + "</span>";
+
+        document.getElementById("patchGatesStrip").innerHTML =
+          '<div class="gate-pill"><div>Gate 1 · AST Syntax</div><strong style="color:var(--pass);">' + (out.gates.ast_syntax_valid ? "PASS (ast.parse)" : "FAIL") + '</strong></div>' +
+          '<div class="gate-pill"><div>Gate 2 · Reachable Re-Scan</div><strong style="color:var(--pass);">' + out.gates.reachable_vulns_before + ' -&gt; ' + out.gates.reachable_vulns_after + ' Reachable</strong></div>' +
+          '<div class="gate-pill"><div>Gate 3 · /tmp Unittest</div><strong style="color:var(--pass);">' + out.gates.unit_tests_passed + ' / ' + out.gates.unit_tests_run + ' Passed</strong></div>';
+
+        document.getElementById("patchFilenameBadge").textContent = out.filename + " (" + out.changed_lines_count + " diff lines)";
+        document.getElementById("patchDiffStatsLabel").textContent = out.patch_actions.length + " surgical edits";
+        document.getElementById("patchActionsList").innerHTML = out.patch_actions.map(function (act) {
+          return '<div class="finding-item" style="padding:0.52rem 0.72rem; font-size:0.8rem;">✓ ' + esc(act) + '</div>';
+        }).join("");
+
+        document.getElementById("patchDiffBox").textContent = out.unified_diff || "(No reachable vulnerabilities required patching)";
+        document.getElementById("patchUnittestTiming").textContent = out.unittest_ms + " ms in /tmp";
+        document.getElementById("patchUnittestBox").textContent = out.unittest_output || "";
+
+        if (out.bedrock_cr_summary && out.bedrock_cr_summary.text) {
+          document.getElementById("patchBedrockBadge").textContent =
+            out.bedrock_cr_summary.model_id + " · " + out.bedrock_cr_summary.latency_ms + " ms · " + out.bedrock_cr_summary.total_tokens + " tok";
+          document.getElementById("patchCrSummaryBox").textContent = out.bedrock_cr_summary.text;
+        } else {
+          document.getElementById("patchBedrockBadge").textContent = "Deterministic Summary";
+          document.getElementById("patchCrSummaryBox").textContent =
+            "Check 'Generate Pull-Request Security Summary via Amazon Bedrock' and click Generate Patch to synthesize a live Nova Lite CR note.";
+        }
+      }
+
+      window.runLiveAutoPatch = async function () {
+        const btn = document.getElementById("btnRunAutoPatch");
+        const sid = document.getElementById("patchServiceSelect").value;
+        const incCr = document.getElementById("patchIncludeBedrockCr").checked;
+        btn.disabled = true;
+        btn.textContent = "⏳ Patching & Running /tmp Tests...";
+        try {
+          const out = await apiPost("/api/patch/verify", {
+            service_id: sid,
+            include_bedrock_cr: incCr
+          });
+          renderAutoPatchResult(out);
+          await refreshLedgerOnly();
+        } catch (err) {
+          document.getElementById("patchDiffBox").textContent = "Error: " + err.message;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🛠️ Generate Patch & Verify Unit Tests";
+        }
+      };
+
+      function renderGraphAndKillchain(out) {
+        const g = out.iam_graph;
+        const ct = out.cloudtrail_detection;
+        const exposed = g.attack_paths_count > 0;
+
+        const banner = document.getElementById("graphVerdictBanner");
+        banner.className = "verdict-banner " + ((exposed || ct.incident_detected) ? "verdict-deny" : "verdict-allow");
+        banner.innerHTML =
+          "<div><strong>" + (exposed ? "⚠ " + g.attack_paths_count + " MULTI-HOP IAM ESCALATION PATH(S) OPEN" : "✅ 0 CROWN-JEWEL ESCALATION PATHS (LEAST PRIVILEGE VERIFIED)") + "</strong><br/>" +
+          "<span style='font-size:0.83rem;'>IAM graph solved in <strong>" + g.solve_ms + " ms</strong> · CloudTrail trace <code>" + esc(ct.trace_id) + "</code> (" + ct.events_analyzed + " events) scored <strong>" + ct.anomaly_score + "</strong> in <strong>" + ct.detect_ms + " ms</strong>.</span></div>" +
+          "<span class='tag " + (exposed ? "tag-fail" : "tag-pass") + "'>" + esc(g.posture_verdict) + "</span>";
+
+        document.getElementById("graphPathCountTag").className = "tag " + (exposed ? "tag-fail" : "tag-pass");
+        document.getElementById("graphPathCountTag").textContent = g.attack_paths_count + " PATH(S)";
+        document.getElementById("graphSolveMsBadge").textContent = "solve: " + g.solve_ms + " ms";
+
+        if (g.attack_paths.length) {
+          document.getElementById("graphPathsList").innerHTML = g.attack_paths.map(function (p) {
+            return (
+              '<div class="finding-item">' +
+                '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.25rem;">' +
+                  '<strong>' + p.hop_count + '-Hop Escalation to ' + esc(p.crown_jewel_label) + '</strong>' +
+                  '<span class="tag tag-fail">Risk ' + p.risk_score + '/100 · ' + esc(p.toxic_rules.join(", ")) + '</span>' +
+                '</div>' +
+                '<div class="mono" style="font-size:0.7rem; color:var(--accent-main);">' + esc(p.ordered_labels.join("  ->  ")) + '</div>' +
+              '</div>'
+            );
+          }).join("");
+        } else {
+          const changes = (g.remediation_changes || []).map(function (c) {
+            return "<div class='mono' style='font-size:0.69rem; margin-top:0.2rem;'>• Fixed " + esc(c.rule_fixed) + ": " + esc(c.action_taken) + "</div>";
+          }).join("");
+          document.getElementById("graphPathsList").innerHTML =
+            '<div class="finding-item" style="border-color:var(--pass);">' +
+              '<strong style="color:var(--pass);">✓ Zero exploitable paths reach crown-jewel S3 or KMS resources.</strong>' +
+              changes +
+            '</div>';
+        }
+
+        document.getElementById("killchainScoreTag").className = "tag " + (ct.incident_detected ? "tag-fail" : "tag-pass");
+        document.getElementById("killchainScoreTag").textContent =
+          (ct.incident_detected ? "INTRUSION ALERT" : "BENIGN TRAFFIC") + " · SCORE " + ct.anomaly_score;
+
+        const timelineHtml = ct.matched_timeline.map(function (ev) {
+          return (
+            "<div class='mono' style='font-size:0.69rem; padding:0.24rem 0; border-bottom:1px dashed var(--border);'>" +
+              "<strong>[" + esc(ev.stage) + "]</strong> " + esc(ev.eventName) + " · IP: " + esc(ev.sourceIPAddress) + (ev.errorCode ? " (" + esc(ev.errorCode) + ")" : "") +
+            "</div>"
+          );
+        }).join("");
+
+        document.getElementById("killchainStagesBox").innerHTML =
+          '<div class="finding-item">' +
+            '<div style="font-weight:700; font-size:0.84rem; margin-bottom:0.3rem;">' + esc(ct.title) + '</div>' +
+            '<div class="mono" style="font-size:0.7rem; color:var(--accent-main); margin-bottom:0.35rem;">Stages Matched: ' + esc(ct.kill_chain_stages_matched.join(" -> ") || "NONE") + '</div>' +
+            (timelineHtml || "<div class='mono' style='font-size:0.7rem; color:var(--ink-muted);'>Routine scoped traffic with zero kill-chain stage triggers.</div>") +
+          '</div>';
+
+        const policyToShow = ct.quarantine_session_policy || g.least_privilege_guardrail_policy;
+        document.getElementById("graphPolicyBox").textContent = JSON.stringify(policyToShow, null, 2);
+      }
+
+      window.runLiveAttackGraphLab = async function () {
+        const btn = document.getElementById("btnRunGraphLab");
+        btn.disabled = true;
+        try {
+          const out = await apiPost("/api/graph/attack-paths", {
+            env_id: document.getElementById("graphEnvSelect").value,
+            apply_least_privilege_patch: document.getElementById("graphApplyIamPatch").checked,
+            trace_id: document.getElementById("graphTraceSelect").value
+          });
+          renderGraphAndKillchain(out);
+          await refreshLedgerOnly();
+        } catch (err) {
+          document.getElementById("graphPolicyBox").textContent = "Error: " + err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      function renderThreatReview(out) {
+        const blocked = out.launch_decision.indexOf("BLOCK") === 0;
+        const banner = document.getElementById("reviewDecisionBanner");
+        banner.className = "verdict-banner " + (blocked ? "verdict-deny" : "verdict-allow");
+        banner.innerHTML =
+          "<div><strong>" + esc(out.launch_decision) + "</strong><br/>" +
+          "<span style='font-size:0.82rem;'>" + esc(out.service_title) + " in <code>" + esc(out.env_id) + "</code> · " + out.open_stride_categories + " / 6 STRIDE categories open.</span></div>" +
+          "<span class='tag " + (blocked ? "tag-fail" : "tag-pass") + "'>" + out.ast_summary.reachable_count + " Code · " + out.iam_summary.attack_paths_count + " IAM</span>";
+
+        document.getElementById("reviewTelemetryBadge").textContent =
+          out.llm_telemetry.model_id + " · " + out.llm_telemetry.latency_ms + " ms · " + out.llm_telemetry.total_tokens + " tok";
+        document.getElementById("reviewNarrativeBox").textContent = out.bedrock_review;
+
+        document.getElementById("strideMatrixBody").innerHTML = out.stride_matrix.map(function (row) {
+          const isOpen = row.status === "FINDING_OPEN";
+          return (
+            "<tr>" +
+              "<td><strong>" + esc(row.stride) + "</strong></td>" +
+              "<td><span class='tag " + (isOpen ? "tag-fail" : "tag-pass") + "'>" + esc(isOpen ? row.severity : "VERIFIED") + "</span></td>" +
+              "<td><div class='mono' style='font-size:0.68rem; color:var(--accent-main); margin-bottom:0.18rem;'>" + esc(row.anchored_evidence.join(" · ")) + "</div>" +
+              "<div style='font-size:0.78rem;'>" + esc(row.finding_summary) + "</div></td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      window.runLiveThreatReview = async function () {
+        const btn = document.getElementById("btnRunThreatReview");
+        btn.disabled = true;
+        btn.textContent = "⏳ Running Live Bedrock STRIDE Review...";
+        try {
+          const out = await apiPost("/api/threat-review", {
+            service_id: document.getElementById("reviewServiceSelect").value,
+            env_id: document.getElementById("reviewEnvSelect").value,
+            architecture_notes: document.getElementById("reviewNotesInput").value,
+            use_bedrock: true
+          });
+          renderThreatReview(out);
+          await refreshLedgerOnly();
+        } catch (err) {
+          document.getElementById("reviewNarrativeBox").textContent = "Error: " + err.message;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🤖 Run Live Bedrock STRIDE Review";
+        }
+      };
+
+      function renderAuditLedger(events, chain) {
+        if (chain) {
+          const badge = document.getElementById("auditChainStatusBadge");
+          badge.className = "tag " + (chain.valid ? "tag-pass" : "tag-fail");
+          badge.textContent = chain.valid
+            ? "Audit Chain: VALID (" + chain.checked_rows + " rows · " + chain.verify_ms + " ms)"
+            : "Audit Chain: BROKEN";
+        }
+        document.getElementById("auditLedgerBody").innerHTML = (events || []).slice(0, 10).map(function (ev) {
+          const ok = ev.verdict === "VERIFIED_READY_FOR_CR" || ev.verdict === "LAUNCH_READY" || ev.verdict === "CLEAR" || ev.verdict === "APPROVED_FOR_PRODUCTION";
+          return (
+            "<tr>" +
+              "<td class='mono'><strong>" + esc(ev.event_id) + "</strong></td>" +
+              "<td class='mono' style='font-size:0.7rem;'>" + esc(ev.category) + "</td>" +
+              "<td class='mono' style='font-size:0.7rem;'>" + esc(ev.target_id) + "</td>" +
+              "<td><span class='tag " + (ok ? "tag-pass" : "tag-warn") + "'>" + esc(ev.verdict) + "</span></td>" +
+              "<td class='mono'>" + Number(ev.duration_ms || 0).toFixed(2) + " ms</td>" +
+              "<td class='mono' style='font-size:0.68rem;'>" + esc(String(ev.sha256_hash || "").slice(0, 18)) + "...</td>" +
+            "</tr>"
+          );
+        }).join("");
+      }
+
+      async function refreshLedgerOnly() {
+        try {
+          const snap = await apiGet("/api/state");
+          if (snap && Array.isArray(snap.audit_events)) {
+            renderAuditLedger(snap.audit_events, snap.audit_chain);
+          }
+        } catch (_) {}
+      }
+
+      window.resetDemoState = async function () {
+        try {
+          await apiPost("/api/reset", {});
+          await initFromBackend();
+        } catch (_) {}
+      };
+
+      async function initFromBackend() {
+        try {
+          const snap = await apiGet("/api/state");
+          if (snap && Array.isArray(snap.services) && snap.services.length) {
+            state.services = snap.services;
+            const cur = state.services.find(function (s) { return s.service_id === state.selectedServiceId; }) || state.services[0];
+            if (cur && !state.sourceModifiedManually) {
+              document.getElementById("scannerSourceEditor").value = cur.source_code;
+              document.getElementById("scannerFilenameLabel").textContent = cur.filename;
+            }
+          }
+          if (snap && snap.benchmarks && snap.benchmarks.headline_kpis) {
+            MEASURED_BENCHMARKS = snap.benchmarks;
+            renderMeasuredKpisAndBenchmarks();
+          }
+          renderServiceCards();
+          renderAuditLedger(snap.audit_events || [], snap.audit_chain);
+
+          // Populate live initial panels without burning unnecessary Bedrock tokens until clicked
+          await runLiveReachabilityScan();
+          const patchInit = await apiPost("/api/patch/verify", { service_id: "orders-checkout-api", include_bedrock_cr: false });
+          renderAutoPatchResult(patchInit);
+          await runLiveAttackGraphLab();
+          const revInit = await apiPost("/api/threat-review", { service_id: "orders-checkout-api", env_id: "env-checkout-prod", use_bedrock: false });
+          renderThreatReview(revInit);
+          await refreshLedgerOnly();
+        } catch (_) {
+          renderServiceCards();
+        }
+      }
+
+      parseHashState();
+      applyTheme(activeTheme);
+      switchTab(activeTab);
+      selectArchNode("ast-scanner");
+      renderMeasuredKpisAndBenchmarks();
+      renderServiceCards();
+      initFromBackend();
+    })();
+  </script>
+</body>
+</html>

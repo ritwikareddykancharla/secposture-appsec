@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secposture-appsec"
+version = "1.0.0"
+description = "SecPosture: AST Call-Graph Reachability Scanner, Multi-Hop IAM Attack-Path Solver, CloudTrail Kill-Chain Detector, STRIDE Threat Modeler & Test-Verified Auto-Patching"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Ritwika Reddy Kancharla" }]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["secposture*"]

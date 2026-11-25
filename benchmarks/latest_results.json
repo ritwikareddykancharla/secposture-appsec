@@ -1,0 +1,493 @@
+{
+  "service": "secposture-appsec",
+  "benchmark_timestamp_utc": "2026-11-25T22:37:13Z",
+  "environment": {
+    "python_version": "3.14.6",
+    "platform": "Darwin 25.6.0 (arm64)",
+    "bedrock_model": "us.amazon.nova-lite-v1:0",
+    "aws_region": "us-west-2",
+    "verification_sandbox": "Isolated /tmp workspace + AST re-scan + subprocess(shell=False) unittest",
+    "audit_store": "SQLite WAL + SHA-256 hash chain"
+  },
+  "headline_kpis": {
+    "services_scanned": 6,
+    "total_raw_findings": 18,
+    "reachable_vulns_found": 10,
+    "unreachable_dead_code_filtered": 8,
+    "alert_noise_reduction_pct": 44.4,
+    "reachable_recall_pct": 100.0,
+    "reachable_precision_pct": 100.0,
+    "ast_scan_p50_ms": 0.509,
+    "ast_scan_p95_ms": 1.086,
+    "autopatch_runs_total": 12,
+    "autopatch_runs_verified": 12,
+    "autopatch_verify_rate_pct": 100.0,
+    "service_unit_tests_passed": 16,
+    "autopatch_loop_p50_ms": 67.01,
+    "autopatch_loop_p95_ms": 98.794,
+    "unittest_sandbox_p50_ms": 64.63,
+    "iam_attack_paths_before": 4,
+    "iam_attack_paths_after_patch": 0,
+    "iam_graph_solve_p50_ms": 0.021,
+    "cloudtrail_traces_total": 16,
+    "cloudtrail_attacks_caught": 8,
+    "cloudtrail_attacks_total": 8,
+    "cloudtrail_false_positives": 0,
+    "cloudtrail_precision_pct": 100.0,
+    "cloudtrail_recall_pct": 100.0,
+    "cloudtrail_detect_p50_ms": 0.006,
+    "bedrock_calls_measured": 8,
+    "bedrock_latency_p50_ms": 1104.0,
+    "bedrock_latency_p95_ms": 2453.9,
+    "bedrock_mean_tokens": 595,
+    "bedrock_total_tokens": 4760,
+    "sqlite_worm_rows_verified": 58,
+    "sqlite_worm_verify_ms": 1.792
+  },
+  "reachability_matrix": [
+    {
+      "service_id": "orders-checkout-api",
+      "title": "Orders & Checkout Ledger Service",
+      "filename": "orders_service.py",
+      "raw_findings": 5,
+      "reachable_vulns": 3,
+      "dead_code_filtered": 2,
+      "posture_score": 28,
+      "posture_status": "BLOCK_LAUNCH",
+      "scan_p50_ms": 1.03,
+      "reachable_rules": [
+        "SEC-AST-SECRET-05",
+        "SEC-AST-SQLI-01",
+        "SEC-AST-SSRF-03"
+      ]
+    },
+    {
+      "service_id": "artifact-build-worker",
+      "title": "Artifact Checksum & Manifest Worker",
+      "filename": "build_worker.py",
+      "raw_findings": 4,
+      "reachable_vulns": 2,
+      "dead_code_filtered": 2,
+      "posture_score": 40,
+      "posture_status": "BLOCK_LAUNCH",
+      "scan_p50_ms": 0.502,
+      "reachable_rules": [
+        "SEC-AST-CMDI-02",
+        "SEC-AST-DESER-04"
+      ]
+    },
+    {
+      "service_id": "tenant-webhook-relay",
+      "title": "Multi-Tenant Webhook Relay Service",
+      "filename": "webhook_relay.py",
+      "raw_findings": 4,
+      "reachable_vulns": 2,
+      "dead_code_filtered": 2,
+      "posture_score": 48,
+      "posture_status": "BLOCK_LAUNCH",
+      "scan_p50_ms": 0.527,
+      "reachable_rules": [
+        "SEC-AST-SQLI-01",
+        "SEC-AST-SSRF-03"
+      ]
+    },
+    {
+      "service_id": "profile-export-lambda",
+      "title": "Customer Profile Export Lambda",
+      "filename": "profile_export.py",
+      "raw_findings": 4,
+      "reachable_vulns": 3,
+      "dead_code_filtered": 1,
+      "posture_score": 14,
+      "posture_status": "BLOCK_LAUNCH",
+      "scan_p50_ms": 0.985,
+      "reachable_rules": [
+        "SEC-AST-CMDI-02",
+        "SEC-AST-DESER-04",
+        "SEC-AST-SQLI-01"
+      ]
+    },
+    {
+      "service_id": "ledger-reconciler-clean",
+      "title": "Hardened Ledger Reconciler (Clean Live Path)",
+      "filename": "reconciler_clean.py",
+      "raw_findings": 1,
+      "reachable_vulns": 0,
+      "dead_code_filtered": 1,
+      "posture_score": 98,
+      "posture_status": "LAUNCH_READY",
+      "scan_p50_ms": 0.426,
+      "reachable_rules": []
+    },
+    {
+      "service_id": "token-verifier-clean",
+      "title": "Zero-Finding Session Verifier (Clean Baseline)",
+      "filename": "token_verifier.py",
+      "raw_findings": 0,
+      "reachable_vulns": 0,
+      "dead_code_filtered": 0,
+      "posture_score": 100,
+      "posture_status": "LAUNCH_READY",
+      "scan_p50_ms": 0.228,
+      "reachable_rules": []
+    }
+  ],
+  "autopatch_matrix": [
+    {
+      "service_id": "orders-checkout-api",
+      "filename": "orders_service.py",
+      "runs": 3,
+      "verified_runs": 3,
+      "vulns_before": 3,
+      "vulns_after": 0,
+      "dead_code_untouched": 2,
+      "unit_tests_passed": 4,
+      "changed_lines": 25,
+      "loop_p50_ms": 72.06,
+      "loop_p95_ms": 73.59,
+      "unittest_p50_ms": 68.08
+    },
+    {
+      "service_id": "artifact-build-worker",
+      "filename": "build_worker.py",
+      "runs": 3,
+      "verified_runs": 3,
+      "vulns_before": 2,
+      "vulns_after": 0,
+      "dead_code_untouched": 2,
+      "unit_tests_passed": 3,
+      "changed_lines": 12,
+      "loop_p50_ms": 96.67,
+      "loop_p95_ms": 100.918,
+      "unittest_p50_ms": 93.49
+    },
+    {
+      "service_id": "tenant-webhook-relay",
+      "filename": "webhook_relay.py",
+      "runs": 3,
+      "verified_runs": 3,
+      "vulns_before": 2,
+      "vulns_after": 0,
+      "dead_code_untouched": 2,
+      "unit_tests_passed": 3,
+      "changed_lines": 23,
+      "loop_p50_ms": 59.89,
+      "loop_p95_ms": 60.844,
+      "unittest_p50_ms": 57.04
+    },
+    {
+      "service_id": "profile-export-lambda",
+      "filename": "profile_export.py",
+      "runs": 3,
+      "verified_runs": 3,
+      "vulns_before": 3,
+      "vulns_after": 0,
+      "dead_code_untouched": 1,
+      "unit_tests_passed": 3,
+      "changed_lines": 16,
+      "loop_p50_ms": 65.36,
+      "loop_p95_ms": 68.33,
+      "unittest_p50_ms": 63.13
+    }
+  ],
+  "iam_graph_matrix": [
+    {
+      "env_id": "env-checkout-prod",
+      "title": "Checkout Production Account (PassRole -> Lambda -> KYC S3 Vault)",
+      "paths_before": 2,
+      "shortest_hops": 3,
+      "paths_after_patch": 0,
+      "solve_ms": 0.107,
+      "verdict_after": "LEAST_PRIVILEGE_VERIFIED"
+    },
+    {
+      "env_id": "env-ci-pipeline",
+      "title": "Artifact Build Pipeline (Unscoped AssumeRole -> Release Signing KMS)",
+      "paths_before": 1,
+      "shortest_hops": 3,
+      "paths_after_patch": 0,
+      "solve_ms": 0.054,
+      "verdict_after": "LEAST_PRIVILEGE_VERIFIED"
+    },
+    {
+      "env_id": "env-analytics-lake",
+      "title": "Webhook & Analytics Account (Self-Escalation iam:AttachRolePolicy -> Financial Lake)",
+      "paths_before": 1,
+      "shortest_hops": 2,
+      "paths_after_patch": 0,
+      "solve_ms": 0.023,
+      "verdict_after": "LEAST_PRIVILEGE_VERIFIED"
+    },
+    {
+      "env_id": "env-hardened-zero-trust",
+      "title": "Hardened Reconciler Account (Scoped Least-Privilege Baseline)",
+      "paths_before": 0,
+      "shortest_hops": 0,
+      "paths_after_patch": 0,
+      "solve_ms": 0.015,
+      "verdict_after": "LEAST_PRIVILEGE_VERIFIED"
+    }
+  ],
+  "cloudtrail_results": [
+    {
+      "trace_id": "CT-ATK-01",
+      "title": "SSRF Role Harvest -> PassRole Lambda -> Bulk KYC S3 Exfiltration",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.99,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.059
+    },
+    {
+      "trace_id": "CT-ATK-02",
+      "title": "Build Worker Credential Theft -> AssumeRole -> Release KMS Key Abuse",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.99,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.014
+    },
+    {
+      "trace_id": "CT-ATK-03",
+      "title": "Webhook Role Self-Escalation via AttachRolePolicy -> Financial Ledger Dump",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.88,
+      "stages": [
+        "RECON",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.009
+    },
+    {
+      "trace_id": "CT-ATK-04",
+      "title": "AccessDenied Enumeration Burst -> SecretsManager Dump -> External Bucket Policy",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.96,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.009
+    },
+    {
+      "trace_id": "CT-ATK-05",
+      "title": "Stolen Ephemeral Session IP Hop -> PassRole EC2 -> S3 Vault Sync",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.98,
+      "stages": [
+        "RECON",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.01
+    },
+    {
+      "trace_id": "CT-ATK-06",
+      "title": "Cross-Role Chaining -> CreateAccessKey Persistence -> KMS Bulk Decrypt",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.99,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.008
+    },
+    {
+      "trace_id": "CT-ATK-07",
+      "title": "SSM Parameter Sweep -> Lambda Env Tamper -> Financial S3 Exfiltration",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.99,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.008
+    },
+    {
+      "trace_id": "CT-ATK-08",
+      "title": "Recon Enumeration -> PutRolePolicy Inline Admin -> Crown S3 Read",
+      "ground_truth": "ATTACK",
+      "detected": true,
+      "anomaly_score": 0.99,
+      "stages": [
+        "RECON",
+        "CREDENTIAL_ACCESS",
+        "LATERAL_MOVEMENT",
+        "EXFILTRATION"
+      ],
+      "detect_ms": 0.007
+    },
+    {
+      "trace_id": "CT-BEN-01",
+      "title": "Routine Checkout Service Scoped S3 Receipt Read/Write (Internal VPC)",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.22,
+      "stages": [
+        "CREDENTIAL_ACCESS"
+      ],
+      "detect_ms": 0.005
+    },
+    {
+      "trace_id": "CT-BEN-02",
+      "title": "Standard GitHub OIDC CI/CD Lambda Deployment (Consistent Deploy Runner)",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.44,
+      "stages": [
+        "RECON",
+        "LATERAL_MOVEMENT"
+      ],
+      "detect_ms": 0.004
+    },
+    {
+      "trace_id": "CT-BEN-03",
+      "title": "Engineer Read-Only IAM Console Inspection (Single Stage Recon Only)",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.22,
+      "stages": [
+        "RECON"
+      ],
+      "detect_ms": 0.005
+    },
+    {
+      "trace_id": "CT-BEN-04",
+      "title": "Scheduled Reconciler Batch Reading Scoped Staging Bucket",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.0,
+      "stages": [],
+      "detect_ms": 0.004
+    },
+    {
+      "trace_id": "CT-BEN-05",
+      "title": "Developer CLI Single AccessDenied Typo Without Escalation or Exfil",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.22,
+      "stages": [
+        "RECON"
+      ],
+      "detect_ms": 0.004
+    },
+    {
+      "trace_id": "CT-BEN-06",
+      "title": "Cold-Start Lambda Secret Fetch Only (No Recon, Lateral, or S3 Burst)",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.22,
+      "stages": [
+        "CREDENTIAL_ACCESS"
+      ],
+      "detect_ms": 0.002
+    },
+    {
+      "trace_id": "CT-BEN-07",
+      "title": "CloudFront Invalidation & Static Web S3 Sync During Release",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.0,
+      "stages": [],
+      "detect_ms": 0.003
+    },
+    {
+      "trace_id": "CT-BEN-08",
+      "title": "Cross-Account Metrics Exporter Assuming Telemetry Role Only",
+      "ground_truth": "BENIGN",
+      "detected": false,
+      "anomaly_score": 0.22,
+      "stages": [
+        "LATERAL_MOVEMENT"
+      ],
+      "detect_ms": 0.004
+    }
+  ],
+  "bedrock_call_results": [
+    {
+      "call_id": "BR-STRIDE-orders-checkout-api",
+      "task_type": "STRIDE Launch Threat Review",
+      "target": "orders-checkout-api",
+      "decision": "BLOCK_LAUNCH_UNTIL_PATCHED",
+      "latency_ms": 2346.0,
+      "tokens": 600
+    },
+    {
+      "call_id": "BR-STRIDE-artifact-build-worker",
+      "task_type": "STRIDE Launch Threat Review",
+      "target": "artifact-build-worker",
+      "decision": "BLOCK_LAUNCH_UNTIL_PATCHED",
+      "latency_ms": 1747.0,
+      "tokens": 439
+    },
+    {
+      "call_id": "BR-STRIDE-tenant-webhook-relay",
+      "task_type": "STRIDE Launch Threat Review",
+      "target": "tenant-webhook-relay",
+      "decision": "BLOCK_LAUNCH_UNTIL_PATCHED",
+      "latency_ms": 2512.0,
+      "tokens": 391
+    },
+    {
+      "call_id": "BR-STRIDE-profile-export-lambda",
+      "task_type": "STRIDE Launch Threat Review",
+      "target": "profile-export-lambda",
+      "decision": "BLOCK_LAUNCH_UNTIL_PATCHED",
+      "latency_ms": 1410.0,
+      "tokens": 598
+    },
+    {
+      "call_id": "BR-PATCHCR-orders-checkout-api",
+      "task_type": "Verified Auto-Patch CR Note",
+      "target": "orders-checkout-api",
+      "decision": "VERIFIED_READY_FOR_CR",
+      "latency_ms": 798.0,
+      "tokens": 699
+    },
+    {
+      "call_id": "BR-PATCHCR-artifact-build-worker",
+      "task_type": "Verified Auto-Patch CR Note",
+      "target": "artifact-build-worker",
+      "decision": "VERIFIED_READY_FOR_CR",
+      "latency_ms": 786.0,
+      "tokens": 716
+    },
+    {
+      "call_id": "BR-PATCHCR-tenant-webhook-relay",
+      "task_type": "Verified Auto-Patch CR Note",
+      "target": "tenant-webhook-relay",
+      "decision": "VERIFIED_READY_FOR_CR",
+      "latency_ms": 529.0,
+      "tokens": 639
+    },
+    {
+      "call_id": "BR-PATCHCR-profile-export-lambda",
+      "task_type": "Verified Auto-Patch CR Note",
+      "target": "profile-export-lambda",
+      "decision": "VERIFIED_READY_FOR_CR",
+      "latency_ms": 741.0,
+      "tokens": 678
+    }
+  ]
+}
