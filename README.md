@@ -4,7 +4,7 @@
 - **Live `/api/health` Endpoint**: https://d1kwh6hktrqv7x.cloudfront.net/api/health
 - **GitHub Repository**: https://github.com/ritwikareddykancharla/secposture-appsec
 
-SecPosture is a Python 3.12 application security and cloud attack-path automation platform deployed on **Amazon CloudFront + Private S3 (OAC) + AWS Lambda (`python3.12`) + SQLite WAL + Amazon Bedrock (`us.amazon.nova-lite-v1:0`)** with `$0.00` idle infrastructure cost.
+SecPosture is a serverless application security and cloud attack-path automation platform deployed on **Amazon CloudFront + Private S3 (OAC) + AWS Lambda (serverless) + SQLite WAL + Amazon Bedrock (`us.amazon.nova-lite-v1:0`)** with `$0.00` idle infrastructure cost.
 
 ![SecPosture System Architecture](docs/architecture.svg)
 
@@ -55,6 +55,6 @@ AWS_PROFILE=portfolio AWS_DEFAULT_REGION=us-west-2 python3 benchmarks/run_benchm
 # 3. Start local workbench at http://localhost:3099
 python3 -m secposture.server
 
-# 4. Deploy to Amazon CloudFront + Private S3 OAC + AWS Lambda Python 3.12
+# 4. Deploy to Amazon CloudFront + Private S3 OAC + AWS Lambda
 ./infra/deploy_cloudfront.sh
 ```
